@@ -1,0 +1,255 @@
+/* Палитра RehubPro: static/css/theme.css. Все основные состояния используют эти токены. */
+:root {
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-tint: #eff6ff;
+  --primary-dark: #1e3a8a;
+  --ink: #0f172a;
+  --muted: #64748b;
+  --line: #e5e9f0;
+  --canvas: #f4f6fb;
+  --surface: #ffffff;
+}
+.sidebar {
+  background: var(--surface);
+  color: var(--ink);
+  border-right: 1px solid var(--line);
+}
+.sidebar .brand-light {
+  color: var(--ink);
+}
+.brand-mark {
+  background: var(--primary-tint);
+  color: var(--primary);
+}
+.company-switch {
+  background: var(--canvas);
+  border-color: var(--line);
+}
+.company-switch select,
+.company-switch select option {
+  color: var(--ink);
+}
+.company-icon {
+  background: var(--primary-tint);
+  color: var(--primary);
+}
+.company-switch .small,
+.company-switch > svg,
+.nav-label {
+  color: var(--muted);
+}
+.nav-item {
+  color: var(--muted);
+}
+.nav-item svg {
+  color: var(--muted);
+}
+.nav-item:hover {
+  background: var(--canvas);
+}
+.nav-item.active {
+  background: var(--primary-tint);
+  color: var(--primary-hover);
+}
+.nav-item.active svg {
+  color: var(--primary);
+}
+.nav-count {
+  background: #dbeafe;
+  color: var(--primary);
+}
+.nav-upcoming > div,
+.workspace-safety {
+  color: var(--muted);
+}
+.user-block {
+  border-top-color: var(--line);
+}
+.user-block strong {
+  color: var(--ink);
+}
+.user-block > div > span,
+.user-block > .icon-button {
+  color: var(--muted);
+}
+.avatar {
+  background: #dbeafe;
+  color: var(--primary-hover);
+}
+.button.primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+.welcome-card {
+  background: var(--primary-tint);
+  border-color: #dbeafe;
+}
+.welcome-label,
+.welcome-copy > p {
+  color: #526b95;
+}
+.welcome-button {
+  color: var(--primary);
+  border-color: #bfdbfe;
+}
+.heading-dot {
+  color: var(--primary);
+}
+.auth-story {
+  background: var(--primary-dark);
+}
+.auth-story .brand-mark {
+  background: #dbeafe;
+  color: var(--primary-dark);
+}
+.sales-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.sales-metrics article {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sales-metrics article > span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.sales-metrics article > strong {
+  font-size: 28px;
+  color: var(--primary);
+}
+.reminder-banner {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+  padding: 18px;
+  margin: 0 0 20px;
+}
+.reminder-banner strong {
+  color: #92400e;
+  font-size: 13px;
+}
+.reminder-banner p {
+  color: #a16207;
+  font-size: 11px;
+  margin-top: 7px;
+  line-height: 1.7;
+}
+.task-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.task-item.task-overdue {
+  border-color: #f5cfb9;
+}
+.task-lead {
+  margin: 16px 0;
+  font-size: 12px;
+  line-height: 1.7;
+  text-align: left;
+}
+.task-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.task-actions > .button {
+  flex: 1;
+}
+@media (max-width: 800px) {
+  .sales-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .reminder-banner {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .task-list {
+    grid-template-columns: 1fr;
+  }
+}
+.integration-intro {
+  margin: 15px 0 20px;
+  line-height: 1.8;
+}
+.integration-address {
+  color: var(--primary);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  margin: 15px 0 22px;
+}
+.integration-help {
+  margin: 22px 0;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.integration-help p {
+  margin: 12px 0;
+  color: var(--muted);
+}
+.integration-help code {
+  display: block;
+  padding: 14px;
+  background: var(--canvas);
+  border-radius: 7px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  font-size: 11px;
+}
+.admission-section {
+  border-block: 1px solid var(--line);
+  padding: 24px 0;
+  margin-top: 25px;
+}
+.admission-section h3 {
+  font-size: 17px;
+}
+.transfer-card {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 16px;
+  margin-bottom: 15px;
+}
+.transfer-card p,
+.transfer-card details {
+  font-size: 11px;
+  line-height: 1.8;
+  margin: 10px 0;
+  color: var(--muted);
+}
+.transfer-card strong {
+  font-size: 12px;
+}
+.transfer-card .transfer-error {
+  color: #a16207;
+}
+.admission-preview {
+  background: var(--primary-tint);
+  padding: 15px;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 1.8;
+}
+.admission-preview p {
+  margin: 9px 0;
+  overflow-wrap: anywhere;
+}
+.confirmation-check {
+  flex-direction: row !important;
+  align-items: flex-start;
+  line-height: 1.8;
+}
+.confirmation-check input {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  margin-top: 3px;
+}

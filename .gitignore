@@ -1,0 +1,26 @@
+# Секреты и локальные настройки
+.env
+.env.*
+!.env.example
+!.env.*.example
+license.json
+*.pem
+*.key
+
+# Локальные данные и сборка
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.sqlite3
+node_modules/
+.next/
+media/
+staticfiles/
+coverage/
+.pytest_cache/
+.ruff_cache/
+.DS_Store
+*.tsbuildinfo
+.local/
+.run/
