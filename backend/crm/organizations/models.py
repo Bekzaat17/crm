@@ -79,8 +79,8 @@ class Invitation(models.Model):
     class Meta:
         constraints = [
             models.CheckConstraint(
-                condition=models.Q(role__in=["admin", "lead", "manager"]),
-                name="crm_invite_non_owner",
+                condition=models.Q(role__in=["owner", "admin", "lead", "manager"]),
+                name="crm_invite_valid_role",
             ),
             models.UniqueConstraint(
                 fields=["organization", "email"],

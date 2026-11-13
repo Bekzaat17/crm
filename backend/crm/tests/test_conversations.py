@@ -144,6 +144,11 @@ class ConversationImportTests(SalesFixtures):
         foreign_path = f"/api/organizations/{self.foreign.id}/leads/{self.lead_record.id}/conversations/"
         self.assertEqual(self.client.get(foreign_path).status_code, 404)
 
+    def test_telegram_source_is_accepted(self):
+        data = self.payload([message("Привет", external_id="1")], external_id="@user")
+        data["source"] = "telegram"
+        self.assertEqual(self.call("imports", data).status_code, 201)
+
     def test_lead_search_for_extension(self):
         items = self.call("leads", method="get").json()["items"]
         self.assertEqual(items[0]["id"], str(self.lead_record.id))

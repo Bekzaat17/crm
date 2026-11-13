@@ -1,7 +1,13 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Building2, ChevronDown, LogOut, ShieldCheck } from "lucide-react";
+import {
+  Building2,
+  ChevronDown,
+  Globe2,
+  LogOut,
+  ShieldCheck,
+} from "lucide-react";
 import { api } from "@/lib/api";
 import { Brand } from "@/components/brand";
 import { useCompany } from "./company-context";
@@ -59,6 +65,11 @@ function Sidebar() {
               )}
             </Link>
           ),
+        )}
+        {session.user?.is_platform_admin && (
+          <Link href="/platform" className="nav-item">
+            <Globe2 size={19} /> Компании платформы
+          </Link>
         )}
       </nav>
       <div className="sidebar-bottom">

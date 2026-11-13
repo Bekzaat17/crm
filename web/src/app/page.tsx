@@ -19,6 +19,7 @@ export default function Home() {
       data.organizations.find((o) => o.id === previous) ||
       data.organizations[0];
     if (company) router.replace(`/c/${company.id}`);
+    else if (data.user.is_platform_admin) router.replace("/platform");
   }, [data, router]);
   if (error)
     return (
@@ -26,7 +27,7 @@ export default function Home() {
         <ErrorAlert message={error} onRetry={reload} />
       </main>
     );
-  if (data?.user && !data.organizations.length)
+  if (data?.user && !data.organizations.length && !data.user.is_platform_admin)
     return (
       <main className="auth-shell">
         <div className="empty-state">

@@ -6,12 +6,13 @@
 
 - `backend/config` — Django settings, URL и WSGI.
 - `backend/crm/core` — общий слой без домена: ошибки, HTTP-обёртка `endpoint`, валидация, токены, лимиты, письма.
-- `backend/crm/accounts` — пользователи, регистрация, вход и восстановление пароля.
+- `backend/crm/accounts` — пользователи, вход и восстановление пароля.
+- `backend/crm/platform_admin` — создание компаний; доступно только суперпользователю (`ensure_superuser` из `.env`).
 - `backend/crm/organizations` — компании, членства, филиалы, приглашения, аудит, права ролей (`permissions.py`) и контекст компании (`context.get_membership`).
 - `backend/crm/sales`, `work`, `integrations` — клиенты, обращения и этапы воронки, задачи и сводка, передача в RehubPro.
 - `backend/crm/notifications` — очередь сообщений, каналы (почта, Telegram, Web Push), напоминания.
 - `backend/crm/conversations` — ключи расширения и импорт переписки (API `/api/ext/`, только Bearer-ключ).
-- `extension` — расширение Chrome MV3 (TypeScript, адаптеры мессенджеров).
+- `extension` — расширение Chrome MV3 (TypeScript, адаптеры WhatsApp Web, Telegram Web, Instagram).
 - `backend/crm/models.py` — только реестр моделей доменных пакетов (одно Django-приложение `crm`, миграции общие).
 - `web/src` — Next.js App Router и TypeScript.
 - `docs/PLAN.md` — последовательность работ и модель предметной области.

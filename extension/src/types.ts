@@ -1,4 +1,4 @@
-export type Source = "whatsapp" | "instagram";
+export type Source = "whatsapp" | "instagram" | "telegram";
 
 export type ImportMessage = {
   external_id?: string;

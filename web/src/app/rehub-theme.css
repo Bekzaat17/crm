@@ -439,3 +439,15 @@ td select {
   align-self: flex-end;
   background: var(--primary-tint);
 }
+.platform-page {
+  min-height: 100vh;
+  background: var(--canvas);
+}
+.platform-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}

@@ -2,10 +2,11 @@
   "manifest_version": 3,
   "name": "RehubPro CRM: передача переписки",
   "version": "0.1.0",
-  "description": "Передаёт выбранный диалог WhatsApp Web или Instagram в обращение RehubPro CRM после просмотра.",
+  "description": "Передаёт выбранный диалог WhatsApp Web, Telegram Web или Instagram в обращение RehubPro CRM после просмотра.",
   "permissions": ["storage"],
   "host_permissions": [
     "https://web.whatsapp.com/*",
+    "https://web.telegram.org/*",
     "https://www.instagram.com/*"
   ],
   "optional_host_permissions": [
@@ -21,6 +22,7 @@
     {
       "matches": [
         "https://web.whatsapp.com/*",
+        "https://web.telegram.org/*",
         "https://www.instagram.com/direct/*"
       ],
       "js": ["content-loader.js"],
@@ -30,7 +32,11 @@
   "web_accessible_resources": [
     {
       "resources": ["content.js", "types.js", "adapters/*.js"],
-      "matches": ["https://web.whatsapp.com/*", "https://www.instagram.com/*"]
+      "matches": [
+        "https://web.whatsapp.com/*",
+        "https://web.telegram.org/*",
+        "https://www.instagram.com/*"
+      ]
     }
   ]
 }

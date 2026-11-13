@@ -10,6 +10,7 @@ from crm.sales.models import Lead
 class Source(models.TextChoices):
     WHATSAPP = "whatsapp", "WhatsApp"
     INSTAGRAM = "instagram", "Instagram"
+    TELEGRAM = "telegram", "Telegram"
 
 
 class ExtensionToken(models.Model):

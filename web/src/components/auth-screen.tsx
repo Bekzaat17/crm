@@ -15,18 +15,10 @@ import {
 import { api, errorMessage, Session } from "@/lib/api";
 import { Brand } from "./brand";
 
-type Mode = "login" | "register" | "verify" | "invite" | "forgot" | "reset";
+type Mode = "login" | "invite" | "forgot" | "reset";
 type Invitation = { company_name: string; email: string; role_label: string };
 const headings = {
   login: ["С возвращением", "Войдите в рабочее пространство вашей команды."],
-  register: [
-    "Начнём с вашей компании",
-    "Создайте пространство центра, затем пригласите сотрудников.",
-  ],
-  verify: [
-    "Подтвердите почту",
-    "Один шаг — и пространство вашей компании будет готово.",
-  ],
   invite: [
     "Вас пригласили в команду",
     "Примите приглашение, чтобы начать совместную работу.",
@@ -64,7 +56,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
         const current = await api<Session>("auth/session");
         if (cancelled) return;
         setSession(current);
-        if ((mode === "login" || mode === "register") && current.user) {
+        if (mode === "login" && current.user) {
           router.replace("/");
           return;
         }
@@ -74,7 +66,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
           });
           if (!cancelled) setInvitation(preview);
         }
-        if (["invite", "verify", "reset"].includes(mode) && !secret)
+        if (["invite", "reset"].includes(mode) && !secret)
           setError(
             "В ссылке отсутствует код. Откройте полную ссылку из письма.",
           );
@@ -98,18 +90,12 @@ export function AuthScreen({ mode }: { mode: Mode }) {
       new FormData(event.currentTarget).entries(),
     );
     try {
-      if (mode === "register") {
-        const result = await api<{ message: string }>("auth/register", data);
-        setNotice(result.message);
-      } else if (mode === "login") {
+      if (mode === "login") {
         await api<Session>("auth/login", data);
         const pending = sessionStorage.getItem("crm-pending-invite");
         router.replace(
           pending ? `/invite#token=${encodeURIComponent(pending)}` : "/",
         );
-      } else if (mode === "verify") {
-        await api<Session>("auth/verify", { token });
-        router.replace("/");
       } else if (mode === "invite") {
         const result = await api<Session & { organization_id: string }>(
           "invitations/accept",
@@ -185,20 +171,12 @@ export function AuthScreen({ mode }: { mode: Mode }) {
           <Brand />
         </div>
         <div className="auth-top-link">
-          {mode === "register" ? (
-            <>
-              Уже есть аккаунт?{" "}
-              <Link href="/login">
-                Войти <ArrowUpRight size={15} />
-              </Link>
-            </>
+          {mode === "login" ? (
+            "Доступ выдаёт владелец компании или администратор платформы."
           ) : (
-            <>
-              Первый раз здесь?{" "}
-              <Link href="/register">
-                Создать компанию <ArrowUpRight size={15} />
-              </Link>
-            </>
+            <Link href="/login">
+              Ко входу <ArrowUpRight size={15} />
+            </Link>
           )}
         </div>
         <div className="auth-card">
@@ -245,8 +223,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
                     </div>
                   )}
                   <form onSubmit={submit} className="auth-form">
-                    {(mode === "register" ||
-                      (mode === "invite" && !session?.user)) && (
+                    {mode === "invite" && !session?.user && (
                       <label>
                         Ваше имя
                         <input
@@ -258,19 +235,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
                         />
                       </label>
                     )}
-                    {mode === "register" && (
-                      <label>
-                        Название компании
-                        <input
-                          name="company_name"
-                          autoComplete="organization"
-                          required
-                          maxLength={160}
-                          placeholder="Например, центр «Новая жизнь»"
-                        />
-                      </label>
-                    )}
-                    {["login", "register", "forgot"].includes(mode) && (
+                    {["login", "forgot"].includes(mode) && (
                       <label>
                         Электронная почта
                         <input
@@ -283,7 +248,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
                         />
                       </label>
                     )}
-                    {(["login", "register", "reset"].includes(mode) ||
+                    {(["login", "reset"].includes(mode) ||
                       (mode === "invite" && !session?.user)) && (
                       <label>
                         Пароль
@@ -311,15 +276,6 @@ export function AuthScreen({ mode }: { mode: Mode }) {
                         Забыли пароль?
                       </Link>
                     )}
-                    {mode === "verify" && (
-                      <div className="verification-note">
-                        <ShieldCheck size={28} />
-                        <p>
-                          Подтверждая почту, вы создадите компанию и станете её
-                          владельцем.
-                        </p>
-                      </div>
-                    )}
                     {mode === "invite" && session?.user && (
                       <p className="small muted">
                         Вы вошли как {session.user.email}.
@@ -329,8 +285,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
                       className="button primary full"
                       disabled={
                         busy ||
-                        (["verify", "reset", "invite"].includes(mode) &&
-                          !token) ||
+                        (["reset", "invite"].includes(mode) && !token) ||
                         (mode === "invite" && !invitation)
                       }
                     >
@@ -338,8 +293,6 @@ export function AuthScreen({ mode }: { mode: Mode }) {
                         ? "Подождите…"
                         : {
                             login: "Войти в пространство",
-                            register: "Создать компанию",
-                            verify: "Подтвердить и открыть компанию",
                             invite: "Присоединиться к команде",
                             forgot: "Отправить ссылку",
                             reset: "Сохранить пароль",
@@ -369,12 +322,6 @@ export function AuthScreen({ mode }: { mode: Mode }) {
                     >
                       Выйти и сменить аккаунт
                     </button>
-                  )}
-                  {mode === "register" && (
-                    <p className="form-note">
-                      <ShieldCheck size={14} /> Сначала подтвердим почту. Затем
-                      вы сможете пригласить команду.
-                    </p>
                   )}
                 </>
               )}

@@ -32,13 +32,3 @@ class User(AbstractUser):
         constraints = [
             models.UniqueConstraint(Lower("email"), name="crm_unique_email_ci")
         ]
-
-
-class Registration(models.Model):
-    email = models.EmailField(unique=True)
-    name = models.CharField(max_length=120)
-    company_name = models.CharField(max_length=160)
-    password_hash = models.CharField(max_length=128)
-    token_hash = models.CharField(max_length=64, unique=True)
-    expires_at = models.DateTimeField()
-    created_at = models.DateTimeField(auto_now_add=True)

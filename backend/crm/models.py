@@ -1,6 +1,6 @@
 """Реестр моделей приложения crm. Модели принадлежат доменным пакетам."""
 
-from crm.accounts.models import Registration, User, UserManager
+from crm.accounts.models import User, UserManager
 from crm.conversations.models import (
     Conversation,
     ExtensionToken,
@@ -60,7 +60,6 @@ __all__ = [
     "PipelineStage",
     "RateLimitBucket",
     "RehubCenter",
-    "Registration",
     "RelatedContact",
     "User",
     "UserManager",

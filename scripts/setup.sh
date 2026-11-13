@@ -36,6 +36,12 @@ if not p.exists():
     p.write_text(content)
     p.chmod(0o600)
     print('Создан отдельный локальный конфиг CRM.')
+# Администратор платформы: единственный, кто создаёт компании.
+content = p.read_text()
+if 'CRM_SUPERUSER_EMAIL=' not in content:
+    content = content.rstrip('\n') + f'\nCRM_SUPERUSER_EMAIL=admin@localhost\nCRM_SUPERUSER_PASSWORD={secrets.token_urlsafe(18)}\n'
+    p.write_text(content)
+    print('Добавлены учётные данные администратора платформы в .env.')
 # Ключи Web Push добавляются и в ранее созданный .env, если их там нет.
 content = p.read_text()
 if 'CRM_VAPID_PRIVATE_KEY=' not in content or 'CRM_VAPID_PRIVATE_KEY=\n' in content:
@@ -46,5 +52,5 @@ if 'CRM_VAPID_PRIVATE_KEY=' not in content or 'CRM_VAPID_PRIVATE_KEY=\n' in cont
     print('Добавлены ключи уведомлений браузера (VAPID).')
 PY
 (cd web && npm ci --no-audit --no-fund)
-(cd backend && ../.venv/bin/python manage.py migrate)
+(cd backend && ../.venv/bin/python manage.py migrate && ../.venv/bin/python manage.py ensure_superuser)
 printf '%s\n' 'CRM подготовлена. Запуск: ./scripts/dev.sh'

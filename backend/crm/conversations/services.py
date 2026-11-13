@@ -114,7 +114,7 @@ def import_fragment(context, data):
         return batch_result(existing), False
     source = data.get("source")
     if source not in Source.values:
-        raise ApiError("Источник должен быть WhatsApp или Instagram.")
+        raise ApiError("Источник должен быть WhatsApp, Telegram или Instagram.")
     # Обращение ищется в области доступа сотрудника, которому выдан ключ.
     lead = find_lead(member, identifier(data.get("lead_id")), lock=True)
     messages = clean_messages(data.get("messages"))

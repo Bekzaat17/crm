@@ -4,7 +4,12 @@ export type Company = {
   role: string;
   role_label: string;
 };
-export type User = { id: string; name: string; email: string };
+export type User = {
+  id: string;
+  name: string;
+  email: string;
+  is_platform_admin: boolean;
+};
 export type Session = {
   user: User | null;
   organizations: Company[];

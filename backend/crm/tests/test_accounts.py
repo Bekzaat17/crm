@@ -9,14 +9,11 @@ from django.db import IntegrityError, transaction
 from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
-from crm.accounts import services as accounts
 from crm.core.tokens import digest
 from crm.models import (
-    AuditEvent,
     Invitation,
     Membership,
     Organization,
-    Registration,
     User,
 )
 from crm.notifications.dispatch import dispatch_all
@@ -31,18 +28,6 @@ class AccountHelpers(TestCase):
         return (client or self.client).post(
             f"/api/{path}/", data=json.dumps(data), content_type="application/json"
         )
-
-    def registration(self, **overrides):
-        data = {
-            "email": "owner@example.test",
-            "name": "Владелец",
-            "company_name": "Первый центр",
-            "password": PASSWORD,
-        }
-        data.update(overrides)
-        response = self.post("auth/register", data)
-        self.assertEqual(response.status_code, 202, response.content)
-        return self.mail_params()["token"][0]
 
     def mail_params(self):
         # Письма уходят через очередь: отправляем всё готовое перед чтением.
@@ -66,85 +51,10 @@ class AccountHelpers(TestCase):
 
 
 class AccountTests(AccountHelpers):
-    def test_company_and_owner_exist_only_after_verification(self):
-        token = self.registration()
-        self.assertFalse(User.objects.exists())
-        self.assertFalse(Organization.objects.exists())
-        pending = Registration.objects.get()
-        self.assertNotEqual(pending.password_hash, PASSWORD)
-        self.assertNotEqual(pending.token_hash, token)
-        response = self.post("auth/verify", {"token": token})
-        self.assertEqual(response.status_code, 200)
-        member = Membership.objects.get()
-        self.assertEqual(member.role, "owner")
-        self.assertEqual(member.organization.name, "Первый центр")
-        self.assertEqual(member.organization.branches.count(), 1)
-        self.assertTrue(member.user.check_password(PASSWORD))
-        self.assertEqual(AuditEvent.objects.get().action, "organization.created")
-        self.assertFalse(Registration.objects.exists())
-
-    def test_confirmation_is_single_use(self):
-        token = self.registration()
-        self.assertEqual(self.post("auth/verify", {"token": token}).status_code, 200)
-        self.assertEqual(self.post("auth/verify", {"token": token}).status_code, 400)
-        self.assertEqual(Organization.objects.count(), 1)
-
-    def test_expired_confirmation_creates_no_company(self):
-        token = self.registration()
-        Registration.objects.update(expires_at=timezone.now() - timedelta(seconds=1))
-        self.assertEqual(self.post("auth/verify", {"token": token}).status_code, 400)
-        self.assertFalse(Organization.objects.exists())
-
-    def test_registration_rolls_back_all_objects(self):
-        token = self.registration()
-        with patch(
-            "crm.organizations.services.Branch.objects.create",
-            side_effect=RuntimeError("test"),
-        ):
-            with self.assertRaises(RuntimeError):
-                accounts.confirm_registration(token)
-        self.assertFalse(User.objects.exists())
-        self.assertFalse(Organization.objects.exists())
-        self.assertTrue(Registration.objects.exists())
-
-    def test_duplicate_email_case_is_not_registered_twice(self):
-        self.owner()
-        response = self.post(
-            "auth/register",
-            {
-                "email": "OWNER@EXAMPLE.TEST",
-                "name": "Имя",
-                "company_name": "Компания",
-                "password": PASSWORD,
-            },
-        )
-        self.assertEqual(response.status_code, 202)
-        self.assertFalse(Registration.objects.exists())
-        self.assertEqual(User.objects.count(), 1)
-
     def test_database_rejects_case_insensitive_duplicate_email(self):
         self.owner()
         with self.assertRaises(IntegrityError), transaction.atomic():
             User.objects.create(email="OWNER@EXAMPLE.TEST", name="Другой")
-
-    def test_weak_password_is_rejected(self):
-        response = self.post(
-            "auth/register",
-            {
-                "email": "a@example.test",
-                "name": "Имя",
-                "company_name": "Центр",
-                "password": "123",
-            },
-        )
-        self.assertEqual(response.status_code, 400)
-        self.assertFalse(Registration.objects.exists())
-
-    def test_registration_reissue_invalidates_old_link(self):
-        old = self.registration()
-        new = self.registration()
-        self.assertEqual(self.post("auth/verify", {"token": old}).status_code, 400)
-        self.assertEqual(self.post("auth/verify", {"token": new}).status_code, 200)
 
     def test_login_normalizes_email_and_logout_closes_session(self):
         self.owner()
@@ -173,25 +83,18 @@ class AccountTests(AccountHelpers):
             429,
         )
 
-    def test_csrf_is_required_even_for_login_and_register(self):
+    def test_csrf_is_required_even_for_login(self):
         browser = Client(enforce_csrf_checks=True)
         self.assertEqual(self.post("auth/login", {}, browser).status_code, 403)
         response = browser.get("/api/auth/session/")
         self.assertIn("csrf_token", response.json())
         response = browser.post(
-            "/api/auth/register/",
-            data=json.dumps(
-                {
-                    "email": "csrf@example.test",
-                    "name": "Имя",
-                    "company_name": "Центр",
-                    "password": PASSWORD,
-                }
-            ),
+            "/api/auth/login/",
+            data=json.dumps({"email": "csrf@example.test", "password": PASSWORD}),
             content_type="application/json",
             HTTP_X_CSRFTOKEN=response.json()["csrf_token"],
         )
-        self.assertEqual(response.status_code, 202)
+        self.assertEqual(response.status_code, 401)
 
     def test_invitation_creates_employee_without_extra_company(self):
         _, org = self.owner()

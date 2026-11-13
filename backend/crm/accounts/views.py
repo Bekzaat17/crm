@@ -5,7 +5,7 @@ from django.middleware.csrf import get_token
 from crm.core.errors import ApiError
 from crm.core.http import endpoint
 from crm.core.throttle import client_throttle, throttle
-from crm.core.validation import clean_email, clean_text
+from crm.core.validation import clean_email
 
 from . import services
 from .serializers import session_data
@@ -25,26 +25,6 @@ def auth_response(request):
 
 @endpoint(["GET"])
 def session(request):
-    return auth_response(request)
-
-
-@endpoint(["POST"])
-def register(request):
-    client_throttle(request, "register-ip", 10)
-    services.request_registration(request.payload)
-    return JsonResponse(
-        {
-            "message": "Если адрес доступен для регистрации, мы отправили письмо. Проверьте почту. Если аккаунт уже есть — войдите."
-        },
-        status=202,
-    )
-
-
-@endpoint(["POST"])
-def verify(request):
-    client_throttle(request, "verify-ip", 30)
-    token = clean_text(request.payload.get("token"), "Код подтверждения", 256)
-    login(request, services.confirm_registration(token))
     return auth_response(request)
 
 

@@ -3,7 +3,13 @@ from crm.organizations.serializers import company_data
 
 
 def user_data(user):
-    return {"id": str(user.id), "email": user.email, "name": user.name}
+    return {
+        "id": str(user.id),
+        "email": user.email,
+        "name": user.name,
+        # Право платформы: только создание компаний, без доступа к их данным.
+        "is_platform_admin": user.is_superuser,
+    }
 
 
 def session_data(user):

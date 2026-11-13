@@ -44,7 +44,7 @@ async function readActiveTab(): Promise<ReadResult> {
     if (error instanceof Error && !error.message.includes("Receiving end"))
       throw error;
     throw new Error(
-      "Откройте диалог WhatsApp Web или Instagram Direct и обновите страницу.",
+      "Откройте диалог WhatsApp Web, Telegram Web или Instagram Direct и обновите страницу.",
     );
   }
 }

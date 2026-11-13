@@ -25,15 +25,47 @@ INVITABLE_ROLES = (
 )
 
 
-def create_organization(owner, name):
-    """Компания создаётся только вместе с владельцем и основным филиалом."""
+def create_organization(actor, name, owner=None):
+    """Компания с основным филиалом; владелец — сразу или по приглашению."""
     organization = Organization.objects.create(name=name)
-    Membership.objects.create(
-        user=owner, organization=organization, role=Membership.Role.OWNER
-    )
+    if owner is not None:
+        Membership.objects.create(
+            user=owner, organization=organization, role=Membership.Role.OWNER
+        )
     Branch.objects.create(organization=organization, name="Основной центр")
-    audit.record(organization.id, owner, "organization.created", organization.id)
+    audit.record(organization.id, actor, "organization.created", organization.id)
     return organization
+
+
+def has_owner(organization_id):
+    return Membership.objects.filter(
+        organization_id=organization_id, role=Membership.Role.OWNER, is_active=True
+    ).exists()
+
+
+def invite_owner(actor, organization, email, mailer: Mailer | None = None):
+    """Приглашение владельца новой компании. Вызывается сервисом платформы."""
+    if has_owner(organization.id):
+        raise ApiError("У компании уже есть владелец.", 409)
+    now = timezone.now()
+    Invitation.objects.filter(
+        organization=organization,
+        email=email,
+        accepted_at__isnull=True,
+        revoked_at__isnull=True,
+    ).update(revoked_at=now)
+    token = new_token()
+    invitation = Invitation.objects.create(
+        organization=organization,
+        email=email,
+        role=Membership.Role.OWNER,
+        invited_by=actor,
+        token_hash=digest(token),
+        expires_at=now + timedelta(days=7),
+    )
+    audit.record(organization.id, actor, "invitation.created", invitation.id)
+    (mailer or default_mailer()).send(invitation_email(invitation, token))
+    return invitation
 
 
 @transaction.atomic
@@ -114,16 +146,23 @@ def _invited_user(invitation, current_user, data):
 @transaction.atomic
 def accept_invitation(token, current_user, data):
     invitation = available_invitation(token, lock=True)
+    if invitation.role == Membership.Role.OWNER:
+        # Компания блокируется: два приглашения владельца не примутся одновременно.
+        Organization.objects.select_for_update().get(pk=invitation.organization_id)
+        if has_owner(invitation.organization_id):
+            raise ApiError("У компании уже есть владелец.", 409)
     user = _invited_user(invitation, current_user, data)
     membership, created = Membership.objects.get_or_create(
         organization=invitation.organization,
         user=user,
         defaults={"role": invitation.role},
     )
-    if not created and not membership.is_active:
+    owner_invite = invitation.role == Membership.Role.OWNER
+    if not created and (not membership.is_active or owner_invite):
         membership.role, membership.is_active = invitation.role, True
         membership.save(update_fields=["role", "is_active"])
-    # Существующему активному сотруднику приглашение не меняет роль.
+    # Активному сотруднику обычное приглашение не меняет роль; приглашение
+    # владельца назначает владельца компании, у которой его ещё нет.
     invitation.accepted_at = timezone.now()
     invitation.save(update_fields=["accepted_at"])
     audit.record(invitation.organization_id, user, "invitation.accepted", invitation.id)
