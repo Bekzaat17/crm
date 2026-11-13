@@ -1,9 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api, errorMessage } from "@/lib/api";
-import type { ClientRecord, LeadRecord } from "@/components/sales/types";
-import { fields } from "@/components/sales/forms";
-import { useSalesMutation } from "@/components/sales/use-sales-mutation";
+import { formatDateTime, todayInput } from "@/lib/format";
+import type { ClientRecord, LeadRecord } from "@/lib/types";
+import { useInterval } from "@/lib/use-interval";
+import { useMutation } from "@/lib/use-mutation";
+import { ErrorAlert } from "@/components/ui/feedback";
+import { fields } from "@/components/ui/form";
 
 type Center = { id: string; name: string; domain: string };
 type Transfer = {
@@ -55,7 +58,7 @@ export function Admission({
     busy,
     error: mutationError,
     run,
-  } = useSalesMutation(() => {
+  } = useMutation(() => {
     setRevision((v) => v + 1);
     onSaved();
   });
@@ -86,11 +89,8 @@ export function Admission({
   const inFlight = transfers.some((t) =>
     ["pending", "retry", "sending"].includes(t.status),
   );
-  useEffect(() => {
-    if (!inFlight) return;
-    const timer = setInterval(() => setRevision((v) => v + 1), 5000);
-    return () => clearInterval(timer);
-  }, [inFlight]);
+  // Пока передача в очереди, статус обновляется каждые 5 секунд.
+  useInterval(() => setRevision((v) => v + 1), inFlight ? 5000 : null);
   return (
     <section className="admission-section">
       <h3>Передача в RehubPro</h3>
@@ -99,11 +99,7 @@ export function Admission({
         фактического поступления. Повторные попытки используют одну и ту же
         операцию.
       </p>
-      {(error || mutationError) && (
-        <div className="alert error" role="alert">
-          {error || mutationError}
-        </div>
-      )}
+      <ErrorAlert message={error || mutationError} />
       {transfers.map((transfer) => (
         <article className="transfer-card" key={transfer.id}>
           <div className="section-title">
@@ -121,17 +117,14 @@ export function Admission({
             </p>
           )}
           {transfer.next_attempt_at && (
-            <p>
-              Следующая попытка:{" "}
-              {new Date(transfer.next_attempt_at).toLocaleString("ru")}
-            </p>
+            <p>Следующая попытка: {formatDateTime(transfer.next_attempt_at)}</p>
           )}
           <details>
             <summary>История доставки</summary>
             {transfer.attempts.map((attempt) => (
               <p key={attempt.number}>
-                Попытка {attempt.number} ·{" "}
-                {new Date(attempt.started_at).toLocaleString("ru")} ·{" "}
+                Попытка {attempt.number} · {formatDateTime(attempt.started_at)}{" "}
+                ·{" "}
                 {attempt.http_status
                   ? `HTTP ${attempt.http_status}`
                   : "Без HTTP-ответа"}{" "}
@@ -226,7 +219,7 @@ export function Admission({
               name="date_of_admission"
               type="date"
               required
-              max={new Date().toLocaleDateString("en-CA")}
+              max={todayInput()}
             />
           </label>
           <div className="admission-preview">

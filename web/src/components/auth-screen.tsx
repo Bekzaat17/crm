@@ -116,8 +116,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
           { ...data, token },
         );
         sessionStorage.removeItem("crm-pending-invite");
-        sessionStorage.setItem("crm-company", result.organization_id);
-        router.replace("/");
+        router.replace(`/c/${result.organization_id}`);
       } else if (mode === "forgot") {
         const result = await api<{ message: string }>("auth/forgot", data);
         setNotice(result.message);

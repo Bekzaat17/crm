@@ -1,8 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
-import { api, errorMessage } from "@/lib/api";
-import { fields } from "@/components/sales/forms";
-import { useSalesMutation } from "@/components/sales/use-sales-mutation";
+import { api } from "@/lib/api";
+import { useMutation } from "@/lib/use-mutation";
+import { useResource } from "@/lib/use-resource";
+import { ErrorAlert, LoadingState } from "@/components/ui/feedback";
+import { fields } from "@/components/ui/form";
+import { useCompany } from "@/components/workspace/company-context";
 
 type Center = {
   id: string;
@@ -24,7 +26,7 @@ function CenterCard({
   root: string;
   onSaved: () => void;
 }) {
-  const { busy, error, run } = useSalesMutation(onSaved);
+  const { busy, error, run } = useMutation(onSaved);
   const command = `python manage.py issue_crm_key --company ${center.company_id} --connection ${center.id}`;
   return (
     <article className="card">
@@ -39,11 +41,7 @@ function CenterCard({
         </span>
       </div>
       <p className="integration-address">{center.endpoint}</p>
-      {error && (
-        <div className="alert error" role="alert">
-          {error}
-        </div>
-      )}
+      <ErrorAlert message={error} />
       <form
         className="auth-form"
         onSubmit={(event) => {
@@ -136,33 +134,11 @@ function CenterCard({
     </article>
   );
 }
-export function Centers({ companyId }: { companyId: string }) {
-  const root = `organizations/${companyId}`;
-  const [centers, setCenters] = useState<Center[]>([]),
-    [error, setError] = useState(""),
-    [revision, setRevision] = useState(0),
-    [loading, setLoading] = useState(true);
-  const refresh = () => setRevision((value) => value + 1);
-  const mutation = useSalesMutation(refresh);
-  useEffect(() => {
-    let active = true;
-    api<{ items: Center[] }>(`${root}/centers`)
-      .then((result) => {
-        if (active) {
-          setCenters(result.items);
-          setError("");
-        }
-      })
-      .catch((cause) => {
-        if (active) setError(errorMessage(cause));
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [root, revision]);
+export function Centers() {
+  const { root } = useCompany();
+  const centers = useResource<{ items: Center[] }>(`${root}/centers`);
+  const refresh = centers.reload;
+  const mutation = useMutation(refresh);
   return (
     <section>
       <article className="card">
@@ -172,11 +148,7 @@ export function Centers({ companyId }: { companyId: string }) {
           test.rehubpro.kz/qqweqw/qweqwe станет
           https://test.rehubpro.kz/crm/create. Путь страницы будет отброшен.
         </p>
-        {mutation.error && (
-          <div className="alert error" role="alert">
-            {mutation.error}
-          </div>
-        )}
+        <ErrorAlert message={mutation.error} />
         <form
           className="auth-form"
           onSubmit={(event) => {
@@ -214,16 +186,12 @@ export function Centers({ companyId }: { companyId: string }) {
           </button>
         </form>
       </article>
-      {error && (
-        <div className="alert error" role="alert">
-          {error}
-        </div>
-      )}
-      {loading ? (
-        <p className="loading-state">Загружаем центры…</p>
+      <ErrorAlert message={centers.error} onRetry={refresh} />
+      {!centers.data ? (
+        <LoadingState text="Загружаем центры…" />
       ) : (
         <div className="task-list sales-section">
-          {centers.map((center) => (
+          {centers.data.items.map((center) => (
             <CenterCard
               key={`${center.id}-${center.version}`}
               center={center}
