@@ -19,6 +19,8 @@ from crm.models import (
     Registration,
     User,
 )
+from crm.notifications.dispatch import dispatch_all
+from crm.notifications.models import OutboundMessage
 
 PASSWORD = "Saffron-River-4729!"
 
@@ -43,6 +45,8 @@ class AccountHelpers(TestCase):
         return self.mail_params()["token"][0]
 
     def mail_params(self):
+        # Письма уходят через очередь: отправляем всё готовое перед чтением.
+        dispatch_all()
         url = re.search(r"http[^\s]+", mail.outbox[-1].body).group(0)
         return parse_qs(urlparse(url).fragment)
 
@@ -280,16 +284,28 @@ class AccountTests(AccountHelpers):
         self.assertEqual(response.status_code, 409)
         self.assertEqual(Invitation.objects.count(), 1)
 
-    def test_mail_failure_rolls_back_invitation(self):
+    def test_mail_failure_keeps_invitation_and_retries(self):
         _, org = self.owner()
-        with patch("crm.core.mail.send_mail", side_effect=OSError("mail unavailable")):
-            response = self.post(
-                f"organizations/{org.id}/invitations",
-                {"email": "manager@example.test", "role": "manager"},
-            )
-        self.assertEqual(response.status_code, 503)
-        self.assertFalse(Invitation.objects.exists())
-        self.assertFalse(AuditEvent.objects.exists())
+        response = self.post(
+            f"organizations/{org.id}/invitations",
+            {"email": "manager@example.test", "role": "manager"},
+        )
+        self.assertEqual(response.status_code, 201)
+        message = OutboundMessage.objects.get(kind="invite")
+        self.assertNotIn("token=", message.body)  # тело зашифровано
+        with patch("crm.notifications.channels.send_mail", side_effect=OSError("down")):
+            dispatch_all()
+        message.refresh_from_db()
+        self.assertEqual(
+            (message.status, message.last_error), ("retry", "smtp_unavailable")
+        )
+        self.assertTrue(Invitation.objects.exists())
+        OutboundMessage.objects.update(next_attempt_at=timezone.now())
+        dispatch_all()
+        message.refresh_from_db()
+        self.assertEqual(message.status, "sent")
+        self.assertEqual((message.subject, message.body), ("", ""))
+        self.assertIn("token=", mail.outbox[-1].body)
 
     def test_password_reset_is_single_use_and_invalidates_existing_sessions(self):
         user, org = self.owner()

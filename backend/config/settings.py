@@ -106,8 +106,24 @@ PASSWORD_RESET_TIMEOUT = 60 * 60
 
 # Ключ шифрования хранится отдельно от базы и должен сохраняться при переносе CRM.
 INTEGRATION_ENCRYPTION_KEY = os.getenv("CRM_INTEGRATION_KEY", "")
+if not INTEGRATION_ENCRYPTION_KEY:
+    if not DEBUG:
+        raise ImproperlyConfigured("Задайте CRM_INTEGRATION_KEY перед запуском.")
+    # Только разработка: ключ живёт до перезапуска, сохранённые данные не расшифровать.
+    from cryptography.fernet import Fernet
+
+    INTEGRATION_ENCRYPTION_KEY = Fernet.generate_key().decode()
 CENTER_ALLOWED_DOMAINS = tuple(
     x.strip().lower()
     for x in os.getenv("CRM_CENTER_ALLOWED_DOMAINS", "rehubpro.kz").split(",")
     if x.strip()
 )
+
+# Уведомления. Без токена или VAPID-ключей соответствующий канал выключен.
+TELEGRAM_BOT_TOKEN = os.getenv("CRM_TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_BOT_USERNAME = os.getenv("CRM_TELEGRAM_BOT_USERNAME", "").lstrip("@")
+VAPID_PUBLIC_KEY = os.getenv("CRM_VAPID_PUBLIC_KEY", "")
+VAPID_PRIVATE_KEY = os.getenv("CRM_VAPID_PRIVATE_KEY", "")
+VAPID_SUBJECT = os.getenv("CRM_VAPID_SUBJECT", "mailto:noreply@localhost")
+# Письма со ссылками уходят через очередь; отправитель заменяется в тестах.
+CRM_MAILER = "crm.notifications.mail.OutboxMailer"

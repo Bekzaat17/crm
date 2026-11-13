@@ -3,6 +3,15 @@
 from crm.accounts.models import Registration, User, UserManager
 from crm.core.models import RateLimitBucket
 from crm.integrations.models import AdmissionTransfer, DeliveryAttempt, RehubCenter
+from crm.notifications.models import (
+    NotificationPreference,
+    OutboundMessage,
+    PushSubscription,
+    ReminderDispatch,
+    TelegramCursor,
+    TelegramLink,
+    TelegramLinkToken,
+)
 from crm.organizations.models import (
     AuditEvent,
     Branch,
@@ -20,6 +29,13 @@ from crm.sales.models import (
 from crm.work.models import FollowUpTask
 
 __all__ = [
+    "NotificationPreference",
+    "OutboundMessage",
+    "PushSubscription",
+    "ReminderDispatch",
+    "TelegramCursor",
+    "TelegramLink",
+    "TelegramLinkToken",
     "AdmissionTransfer",
     "AuditEvent",
     "Branch",

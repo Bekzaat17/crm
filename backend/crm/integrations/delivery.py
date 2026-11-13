@@ -1,19 +1,17 @@
 """Transactional Outbox: БД — очередь, HTTPS-адаптер подменяется в тестах."""
 
 import http.client
-import random
-import uuid
 from datetime import timedelta
 
 from django.db import transaction
-from django.db.models import Q
 from django.utils import timezone
 
+from crm.core import outbox
+from crm.core.crypto import decrypt
 from crm.core.errors import ApiError
 from crm.sales.models import LeadActivity
 
 from .models import AdmissionTransfer, DeliveryAttempt
-from .secrets import decrypt
 from .transport import HTTPSClient, Transport
 
 MAX_ATTEMPTS = 8
@@ -23,15 +21,7 @@ LEASE_SECONDS = 120
 @transaction.atomic
 def claim_next():
     now = timezone.now()
-    eligible = Q(status__in=["pending", "retry"], next_attempt_at__lte=now) | Q(
-        status="sending", lease_until__lte=now
-    )
-    job = (
-        AdmissionTransfer.objects.select_for_update(skip_locked=True)
-        .filter(eligible)
-        .order_by("next_attempt_at", "id")
-        .first()
-    )
+    job = outbox.lock_next(AdmissionTransfer.objects, now)
     if job is None:
         return None
     if job.cycle_attempts >= MAX_ATTEMPTS:
@@ -39,9 +29,7 @@ def claim_next():
         job.last_error = "attempts_exhausted"
         job.save()
         return None
-    job.status = "sending"
-    job.lease_id = uuid.uuid4()
-    job.lease_until = now + timedelta(seconds=LEASE_SECONDS)
+    outbox.take_lease(job, LEASE_SECONDS, now)
     job.attempt_count += 1
     job.cycle_attempts += 1
     job.save()
@@ -76,11 +64,7 @@ def classify(reply, operation_id):
 
 @transaction.atomic
 def finish(job, status, error, http_status=None, resident_id="", retry_after=0):
-    current = (
-        AdmissionTransfer.objects.select_for_update()
-        .filter(pk=job.id, status="sending", lease_id=job.lease_id)
-        .first()
-    )
+    current = outbox.current_lease(AdmissionTransfer.objects, job)
     if current is None:
         return
     now = timezone.now()
@@ -91,8 +75,7 @@ def finish(job, status, error, http_status=None, resident_id="", retry_after=0):
         status = "failed"
     current.status = status
     current.last_error = error
-    current.lease_until = None
-    current.lease_id = None
+    outbox.release(current)
     if status == "delivered":
         current.resident_id = resident_id
         current.delivered_at = now
@@ -104,10 +87,7 @@ def finish(job, status, error, http_status=None, resident_id="", retry_after=0):
             text=f"Центр «{current.center.name}» подтвердил передачу. Резидент №{resident_id}.",
         )
     elif status == "retry":
-        delay = max(
-            retry_after,
-            min(3600, 30 * 2 ** (current.cycle_attempts - 1)) + random.randint(0, 15),
-        )
+        delay = outbox.backoff_seconds(current.cycle_attempts, retry_after)
         current.next_attempt_at = now + timedelta(seconds=delay)
     current.save()
 

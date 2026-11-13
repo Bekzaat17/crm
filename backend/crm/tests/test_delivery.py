@@ -7,10 +7,10 @@ from cryptography.fernet import Fernet
 from django.test import override_settings
 from django.utils import timezone
 
+from crm.core.crypto import decrypt
 from crm.core.errors import ApiError
 from crm.integrations import delivery, services
 from crm.integrations.address import normalize_domain
-from crm.integrations.secrets import decrypt
 from crm.integrations.transport import Reply, public_address
 from crm.models import AdmissionTransfer, RehubCenter
 from crm.tests.test_sales import SalesFixtures

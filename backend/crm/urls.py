@@ -7,4 +7,5 @@ urlpatterns = [
     path("", include("crm.sales.urls")),
     path("", include("crm.accounts.urls")),
     path("", include("crm.organizations.urls")),
+    path("", include("crm.notifications.urls")),
 ]

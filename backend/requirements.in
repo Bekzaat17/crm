@@ -3,3 +3,4 @@ psycopg[binary]>=3.2,<4
 python-dotenv>=1.0,<2
 gunicorn>=23,<24
 cryptography>=46,<49
+pywebpush>=2.5,<3

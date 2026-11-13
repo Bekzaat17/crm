@@ -8,6 +8,7 @@ def registration_email(email, token):
         message="Подтвердите почту, чтобы создать компанию. Ссылка действует 24 часа.",
         page="verify",
         params={"token": token},
+        key=f"registration:{email}",
     )
 
 
@@ -18,4 +19,5 @@ def password_reset_email(user, token):
         message="Задайте новый пароль. Ссылка действует один час.",
         page="reset",
         params={"uid": str(user.id), "token": token},
+        key=f"password-reset:{user.id}",
     )

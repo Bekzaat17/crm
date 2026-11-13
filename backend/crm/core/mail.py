@@ -6,6 +6,7 @@ from urllib.parse import urlencode
 
 from django.conf import settings
 from django.core.mail import send_mail
+from django.utils.module_loading import import_string
 
 
 @dataclass(frozen=True)
@@ -18,6 +19,8 @@ class LinkEmail:
     message: str
     page: str
     params: dict = field(default_factory=dict)
+    # Ключ дедупликации в очереди: новое письмо того же назначения заменяет старое.
+    key: str = ""
 
     @property
     def url(self):
@@ -41,4 +44,5 @@ class DjangoMailer:
 
 
 def default_mailer() -> Mailer:
-    return DjangoMailer()
+    """Отправитель из настроек CRM_MAILER (по умолчанию — очередь писем)."""
+    return import_string(settings.CRM_MAILER)()

@@ -7,8 +7,26 @@ if [[ ! -d .venv ]]; then "$python_bin" -m venv .venv; fi
 .venv/bin/python -m pip install -r backend/requirements.txt
 .venv/bin/python - <<'PY'
 from pathlib import Path
+import base64
 import secrets
 from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+
+
+def b64(data):
+    return base64.urlsafe_b64encode(data).decode().rstrip('=')
+
+
+def vapid_keys():
+    key = ec.generate_private_key(ec.SECP256R1())
+    private = key.private_numbers().private_value.to_bytes(32, 'big')
+    public = key.public_key().public_bytes(
+        serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint
+    )
+    return b64(private), b64(public)
+
+
 p = Path('.env')
 if not p.exists():
     content = Path('.env.example').read_text()
@@ -18,6 +36,14 @@ if not p.exists():
     p.write_text(content)
     p.chmod(0o600)
     print('Создан отдельный локальный конфиг CRM.')
+# Ключи Web Push добавляются и в ранее созданный .env, если их там нет.
+content = p.read_text()
+if 'CRM_VAPID_PRIVATE_KEY=' not in content or 'CRM_VAPID_PRIVATE_KEY=\n' in content:
+    private, public = vapid_keys()
+    lines = [l for l in content.splitlines() if not l.startswith(('CRM_VAPID_PRIVATE_KEY=', 'CRM_VAPID_PUBLIC_KEY='))]
+    lines += [f'CRM_VAPID_PUBLIC_KEY={public}', f'CRM_VAPID_PRIVATE_KEY={private}']
+    p.write_text('\n'.join(lines) + '\n')
+    print('Добавлены ключи уведомлений браузера (VAPID).')
 PY
 (cd web && npm ci --no-audit --no-fund)
 (cd backend && ../.venv/bin/python manage.py migrate)

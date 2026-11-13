@@ -12,4 +12,5 @@ def invitation_email(invitation, token):
         ),
         page="invite",
         params={"token": token},
+        key=f"invitation:{invitation.id}",
     )

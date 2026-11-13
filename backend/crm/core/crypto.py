@@ -8,7 +8,7 @@ def cipher():
     try:
         return Fernet(settings.INTEGRATION_ENCRYPTION_KEY.encode())
     except (ValueError, TypeError):
-        raise ApiError("Не настроен ключ шифрования подключений CRM.", 503)
+        raise ApiError("Не настроен ключ шифрования CRM (CRM_INTEGRATION_KEY).", 503)
 
 
 def encrypt(value):
@@ -20,5 +20,6 @@ def decrypt(value):
         return cipher().decrypt(value.encode()).decode()
     except InvalidToken:
         raise ApiError(
-            "Не удалось открыть ключ подключения. Проверьте конфигурацию CRM.", 503
+            "Не удалось расшифровать сохранённые данные. Проверьте конфигурацию CRM.",
+            503,
         )

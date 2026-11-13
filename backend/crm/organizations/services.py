@@ -75,7 +75,7 @@ def invite_member(actor, organization_id, data, mailer: Mailer | None = None):
         expires_at=now + timedelta(days=7),
     )
     audit.record(organization.id, actor, "invitation.created", invitation.id)
-    # Письмо отправляется до commit: ошибка SMTP не оставляет активное приглашение.
+    # Письмо ставится в очередь в той же транзакции, что и приглашение.
     (mailer or default_mailer()).send(invitation_email(invitation, token))
     return invitation
 
