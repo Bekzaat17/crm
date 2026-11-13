@@ -12,6 +12,8 @@ class Client(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.PROTECT)
     name = models.CharField("ФИО клиента", max_length=240)
     phone = models.CharField("Телефон", max_length=40, blank=True)
+    # Только цифры: поиск клиента по номеру собеседника в мессенджере.
+    phone_digits = models.CharField(max_length=20, blank=True, db_index=True)
     city = models.CharField("Город", max_length=120, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
     notes = models.TextField(blank=True)
@@ -28,6 +30,7 @@ class RelatedContact(models.Model):
     name = models.CharField(max_length=240)
     relationship = models.CharField(max_length=80)
     phone = models.CharField(max_length=40, blank=True)
+    phone_digits = models.CharField(max_length=20, blank=True, db_index=True)
     version = models.PositiveIntegerField(default=1)
 
 

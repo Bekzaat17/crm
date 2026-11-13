@@ -18,7 +18,7 @@ def message(text, direction="in", **extra):
     return {"direction": direction, "author": "Собеседник", "text": text, **extra}
 
 
-class ConversationImportTests(SalesFixtures):
+class ImportFixtures(SalesFixtures):
     def setUp(self):
         super().setUp()
         self.lead_record = self.lead()
@@ -48,6 +48,8 @@ class ConversationImportTests(SalesFixtures):
             "history_note": "Загружены видимые сообщения",
         }
 
+
+class ConversationImportTests(ImportFixtures):
     def test_secret_is_shown_once_and_stored_hashed(self):
         token = ExtensionToken.objects.get()
         self.assertNotEqual(token.token_hash, self.secret)
@@ -152,3 +154,112 @@ class ConversationImportTests(SalesFixtures):
     def test_lead_search_for_extension(self):
         items = self.call("leads", method="get").json()["items"]
         self.assertEqual(items[0]["id"], str(self.lead_record.id))
+
+
+EXT_ID = "bmpbpohmpkpikemmocmchnhccmcneolc"
+REDIRECT = f"https://{EXT_ID}.chromiumapp.org/crm"
+
+
+class ExtensionConnectTests(SalesFixtures):
+    def authorize(self, **overrides):
+        data = {
+            "company_id": str(self.org.id),
+            "redirect_uri": REDIRECT,
+            "state": "synthetic-state-123",
+            **overrides,
+        }
+        return self.post("extension/authorize", data)
+
+    def test_login_flow_returns_token_in_fragment(self):
+        response = self.authorize()
+        self.assertEqual(response.status_code, 200, response.content)
+        redirect = response.json()["redirect"]
+        self.assertTrue(redirect.startswith(REDIRECT + "#"))
+        params = dict(p.split("=", 1) for p in redirect.split("#", 1)[1].split("&"))
+        self.assertTrue(params["token"].startswith("crx_"))
+        self.assertEqual(params["state"], "synthetic-state-123")
+        session = Client().get(
+            "/api/ext/session/", HTTP_AUTHORIZATION=f"Bearer {params['token']}"
+        )
+        self.assertEqual(session.status_code, 200)
+
+    def test_unknown_extension_and_bad_input_are_rejected(self):
+        other = "https://" + "a" * 32 + ".chromiumapp.org/crm"
+        self.assertEqual(self.authorize(redirect_uri=other).status_code, 403)
+        self.assertEqual(
+            self.authorize(redirect_uri="https://evil.example/crm").status_code, 403
+        )
+        self.assertEqual(self.authorize(state="x").status_code, 400)
+        self.client.force_login(self.manager)
+        foreign = self.authorize(company_id=str(self.foreign.id))
+        self.assertEqual(foreign.status_code, 404)
+        self.assertFalse(ExtensionToken.objects.exists())
+
+    def test_requires_session(self):
+        self.client.logout()
+        self.assertEqual(self.authorize().status_code, 401)
+
+
+class TrackingTests(ImportFixtures):
+    def chat(self, **extra):
+        return {"source": "whatsapp", "external_id": "77000000000@c.us", **extra}
+
+    def test_track_lookup_untrack(self):
+        lookup = self.ext.get(
+            "/api/ext/conversations/lookup/",
+            self.chat(),
+            HTTP_AUTHORIZATION=f"Bearer {self.secret}",
+        ).json()
+        self.assertFalse(lookup["tracked"])
+        tracked = self.call(
+            "conversations/track",
+            self.chat(title="Тестовый чат", lead_id=str(self.lead_record.id)),
+        ).json()
+        self.assertTrue(tracked["tracked"])
+        self.assertEqual(tracked["lead"]["id"], str(self.lead_record.id))
+        again = self.ext.get(
+            "/api/ext/conversations/lookup/",
+            self.chat(),
+            HTTP_AUTHORIZATION=f"Bearer {self.secret}",
+        ).json()
+        self.assertTrue(again["tracked"])
+        self.assertFalse(
+            self.call("conversations/untrack", self.chat()).json()["tracked"]
+        )
+
+    def test_tracked_chat_with_messages_is_not_moved(self):
+        self.call(
+            "imports",
+            self.payload(
+                [message("a", external_id="1")], external_id="77000000000@c.us"
+            ),
+        )
+        other = self.lead(title="Второе")
+        response = self.call(
+            "conversations/track",
+            self.chat(title="Чат", lead_id=str(other.id)),
+        )
+        self.assertEqual(response.status_code, 409)
+
+    def test_match_by_normalized_phone(self):
+        # У клиента номер +70000000000, в мессенджере тот же номер без «+».
+        self.client_record.phone_digits = "70000000000"
+        self.client_record.save()
+        found = self.call("match", method="get")
+        self.assertEqual(found.status_code, 200)
+        response = self.ext.get(
+            "/api/ext/match/",
+            {"phone": "8 (000) 000-00-00"},
+            HTTP_AUTHORIZATION=f"Bearer {self.secret}",
+        ).json()
+        self.assertEqual(
+            [i["id"] for i in response["items"]], [str(self.lead_record.id)]
+        )
+
+    def test_client_phone_digits_are_saved(self):
+        self.post(
+            self.url(f"clients/{self.client_record.id}"),
+            {"name": "Тестовый клиент", "phone": "8 701 000-00-01", "version": 1},
+        )
+        self.client_record.refresh_from_db()
+        self.assertEqual(self.client_record.phone_digits, "77010000001")

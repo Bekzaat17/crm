@@ -13,6 +13,7 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { api, errorMessage, Session } from "@/lib/api";
+import { takeReturnPath } from "@/lib/return-path";
 import { Brand } from "./brand";
 
 type Mode = "login" | "invite" | "forgot" | "reset";
@@ -57,7 +58,7 @@ export function AuthScreen({ mode }: { mode: Mode }) {
         if (cancelled) return;
         setSession(current);
         if (mode === "login" && current.user) {
-          router.replace("/");
+          router.replace(takeReturnPath());
           return;
         }
         if (mode === "invite" && secret) {
@@ -94,7 +95,9 @@ export function AuthScreen({ mode }: { mode: Mode }) {
         await api<Session>("auth/login", data);
         const pending = sessionStorage.getItem("crm-pending-invite");
         router.replace(
-          pending ? `/invite#token=${encodeURIComponent(pending)}` : "/",
+          pending
+            ? `/invite#token=${encodeURIComponent(pending)}`
+            : takeReturnPath(),
         );
       } else if (mode === "invite") {
         const result = await api<Session & { organization_id: string }>(

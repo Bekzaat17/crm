@@ -2,6 +2,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date
 
 from crm.core.errors import ApiError
+from crm.core.phones import phone_digits
 from crm.core.validation import clean_text, optional
 
 
@@ -18,9 +19,11 @@ def birth_date(raw):
 
 
 def client_fields(data):
+    phone = optional(data, "phone", 40)
     return dict(
         name=clean_text(data.get("name"), "ФИО клиента", 240),
-        phone=optional(data, "phone", 40),
+        phone=phone,
+        phone_digits=phone_digits(phone),
         city=optional(data, "city", 120),
         notes=optional(data, "notes", 5000),
         date_of_birth=birth_date(data.get("date_of_birth")),

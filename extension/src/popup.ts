@@ -1,5 +1,10 @@
-import { CrmClient } from "./crm-client.js";
-import { loadSettings, saveSettings } from "./settings.js";
+import {
+  chatPhone,
+  CrmClient,
+  type ChatRef,
+  type ChatStatus,
+} from "./crm-client.js";
+import { loadSettings, login, logout } from "./settings.js";
 import type { ReadResult } from "./types.js";
 
 const $ = <T extends HTMLElement>(id: string) =>
@@ -9,32 +14,24 @@ const status = (text: string, error = false) => {
   $("status").textContent = text;
   $("status").className = error ? "status error" : "status";
 };
+const message = (error: unknown) =>
+  error instanceof Error ? error.message : "Ошибка";
 
-let read: ReadResult | null = null;
 let client: CrmClient | null = null;
+let read: ReadResult | null = null;
+let tabId: number | undefined;
 
-/** Один ключ повтора на фрагмент: после потери ответа повтор не создаст дублей. */
-async function idempotencyKey(fragment: ReadResult, leadId: string) {
-  const signature = JSON.stringify([
-    fragment.conversation.external_id,
-    leadId,
-    fragment.messages.length,
-    fragment.messages.at(-1)?.external_id || fragment.messages.at(-1)?.text,
-  ]);
-  const { pending } = (await chrome.storage.local.get("pending")) as {
-    pending?: { signature: string; key: string };
-  };
-  if (pending?.signature === signature) return pending.key;
-  const key = crypto.randomUUID();
-  await chrome.storage.local.set({ pending: { signature, key } });
-  return key;
-}
+const chatRef = (fragment: ReadResult): ChatRef => ({
+  source: fragment.source,
+  external_id: fragment.conversation.external_id,
+});
 
 async function readActiveTab(): Promise<ReadResult> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) throw new Error("Нет активной вкладки.");
+  tabId = tab?.id;
+  if (!tabId) throw new Error("Нет активной вкладки.");
   try {
-    const response = await chrome.tabs.sendMessage(tab.id, {
+    const response = await chrome.tabs.sendMessage(tabId, {
       type: "rehub:read",
     });
     if (!response?.ok)
@@ -44,42 +41,15 @@ async function readActiveTab(): Promise<ReadResult> {
     if (error instanceof Error && !error.message.includes("Receiving end"))
       throw error;
     throw new Error(
-      "Откройте диалог WhatsApp Web, Telegram Web или Instagram Direct и обновите страницу.",
+      "Откройте чат WhatsApp Web, Telegram Web или Instagram и обновите страницу.",
     );
   }
 }
 
-function renderPreview(fragment: ReadResult) {
-  $("conversation").textContent =
-    `${fragment.conversation.title} · ${fragment.messages.length} сообщ.`;
-  const list = $("messages");
-  list.replaceChildren();
-  const sample = [
-    ...fragment.messages.slice(0, 3),
-    ...fragment.messages.slice(-3),
-  ];
-  for (const message of new Set(sample)) {
-    const item = document.createElement("li");
-    item.className = message.direction;
-    item.textContent = message.text || "Вложение";
-    list.append(item);
-  }
-  const warnings = $("warnings");
-  warnings.replaceChildren(
-    ...fragment.warnings.map((w) =>
-      Object.assign(document.createElement("li"), { textContent: w }),
-    ),
-  );
-  show("preview", true);
-}
-
-async function searchLeads() {
-  if (!client) return;
-  const select = $<HTMLSelectElement>("lead");
-  const { items } = await client.leads(
-    $<HTMLInputElement>("lead-search").value,
-  );
-  select.replaceChildren(
+function fillLeads(
+  items: { id: string; title: string; client_name: string; stage: string }[],
+) {
+  $<HTMLSelectElement>("lead").replaceChildren(
     ...items.map((lead) =>
       Object.assign(document.createElement("option"), {
         value: lead.id,
@@ -87,79 +57,138 @@ async function searchLeads() {
       }),
     ),
   );
-  $<HTMLButtonElement>("send").disabled = !items.length || !read;
+  $<HTMLInputElement>("track").disabled = !items.length;
+}
+
+function renderStatus(current: ChatStatus) {
+  show("tracked", current.tracked);
+  show("untracked", !current.tracked);
+  if (current.tracked && current.lead)
+    $("tracked-lead").textContent =
+      `✓ Отслеживается → ${current.lead.client_name} · ${current.lead.title}`;
+}
+
+async function suggestLeads(fragment: ReadResult) {
+  if (!client) return;
+  const phone = chatPhone(fragment);
+  if (phone) {
+    const { items } = await client.match(phone);
+    if (items.length) {
+      fillLeads(items);
+      $("match-note").textContent =
+        items.length === 1
+          ? "Найдено по номеру собеседника."
+          : "По номеру найдено несколько обращений — выберите нужное.";
+      return;
+    }
+    $("match-note").textContent =
+      "Номер не найден в CRM. Выберите обращение поиском.";
+  }
+  fillLeads((await client.leads("")).items);
 }
 
 async function start() {
   const settings = await loadSettings();
   $<HTMLInputElement>("crm-url").value = settings.crmUrl;
-  if (!settings.crmUrl || !settings.key) {
-    show("settings-form", true);
-    status("Укажите адрес CRM и ключ из настроек «Расширение браузера».");
+  if (!settings.key) {
+    show("login-form", true);
+    show("logout", false);
+    status("Войдите один раз — дальше расширение работает само.");
     return;
   }
+  show("login-form", false);
+  show("logout", true);
   client = new CrmClient(settings);
   try {
     const session = await client.session();
     $("account").textContent = `${session.company} · ${session.user}`;
     read = await readActiveTab();
-    renderPreview(read);
-    await searchLeads();
-    status("Проверьте сообщения и выберите обращение.");
+    $("chat-title").textContent = read.conversation.title;
+    $("chat-meta").textContent = `${read.messages.length} сообщ. на странице`;
+    $("warnings").replaceChildren(
+      ...read.warnings.map((w) =>
+        Object.assign(document.createElement("li"), { textContent: w }),
+      ),
+    );
+    show("chat", true);
+    const current = await client.status(chatRef(read));
+    renderStatus(current);
+    if (!current.tracked) await suggestLeads(read);
+    status("");
   } catch (error) {
-    status(error instanceof Error ? error.message : "Ошибка", true);
+    status(message(error), true);
   }
 }
 
-$("toggle-settings").addEventListener("click", () =>
-  show("settings-form", $("settings-form").hidden),
-);
-$("settings-form").addEventListener("submit", async (event) => {
+$("login-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
-    await saveSettings(
-      $<HTMLInputElement>("crm-url").value,
-      $<HTMLInputElement>("key").value,
-    );
-    $<HTMLInputElement>("key").value = "";
-    show("settings-form", false);
+    status("Подтвердите доступ на странице CRM…");
+    await login($<HTMLInputElement>("crm-url").value);
     await start();
   } catch (error) {
-    status(error instanceof Error ? error.message : "Ошибка", true);
+    status(message(error), true);
   }
 });
+
+$("logout").addEventListener("click", async () => {
+  await logout();
+  show("chat", false);
+  $("account").textContent = "";
+  await start();
+});
+
 let timer = 0;
 $("lead-search").addEventListener("input", () => {
   clearTimeout(timer);
-  timer = window.setTimeout(
-    () => void searchLeads().catch((e) => status(e.message, true)),
-    250,
-  );
+  timer = window.setTimeout(async () => {
+    try {
+      fillLeads(
+        (await client!.leads($<HTMLInputElement>("lead-search").value)).items,
+      );
+      $("match-note").textContent = "";
+    } catch (error) {
+      status(message(error), true);
+    }
+  }, 250);
 });
-$("send").addEventListener("click", async () => {
-  if (!client || !read) return;
-  const leadId = $<HTMLSelectElement>("lead").value;
-  const button = $<HTMLButtonElement>("send");
-  button.disabled = true;
-  status("Передаём…");
+
+$("track").addEventListener("change", async () => {
+  if (!client || !read || !$<HTMLInputElement>("track").checked) return;
   try {
-    const result = await client.importFragment(
-      read,
-      leadId,
-      await idempotencyKey(read, leadId),
+    const current = await client.track(
+      chatRef(read),
+      read.conversation.title,
+      $<HTMLSelectElement>("lead").value,
     );
-    await chrome.storage.local.remove("pending");
-    status(
-      `Готово: новых сообщений ${result.created}, уже были в CRM ${result.duplicates}.`,
-    );
+    renderStatus(current);
+    await chrome.runtime.sendMessage({ type: "rehub:status-changed" });
+    if (tabId) await chrome.tabs.sendMessage(tabId, { type: "rehub:resync" });
+    status("Чат отслеживается. Сообщения передаются в CRM.");
   } catch (error) {
-    // Ключ повтора сохранён: нажмите ещё раз, дублей не будет.
-    status(
-      `${error instanceof Error ? error.message : "Ошибка"} Можно безопасно повторить.`,
-      true,
-    );
-    button.disabled = false;
+    $<HTMLInputElement>("track").checked = false;
+    status(message(error), true);
   }
+});
+
+$("untrack").addEventListener("click", async () => {
+  if (!client || !read) return;
+  try {
+    renderStatus(await client.untrack(chatRef(read)));
+    await chrome.runtime.sendMessage({ type: "rehub:status-changed" });
+    $<HTMLInputElement>("track").checked = false;
+    await suggestLeads(read);
+    status("Отслеживание выключено. Уже переданные сообщения остаются в CRM.");
+  } catch (error) {
+    status(message(error), true);
+  }
+});
+
+$("sync").addEventListener("click", async () => {
+  if (!tabId) return;
+  await chrome.runtime.sendMessage({ type: "rehub:status-changed" });
+  await chrome.tabs.sendMessage(tabId, { type: "rehub:resync" });
+  status("Синхронизация запущена.");
 });
 
 void start();

@@ -451,3 +451,20 @@ td select {
   background: var(--surface);
   border-bottom: 1px solid var(--line);
 }
+.connect-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background: var(--canvas);
+}
+.connect-card {
+  width: min(440px, 100%);
+  display: grid;
+  gap: 12px;
+}
+.connect-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

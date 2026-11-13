@@ -1,8 +1,11 @@
 """Токены расширения: хранится только хеш, открытый токен показывается один раз."""
 
+import re
 from dataclasses import dataclass
 from datetime import timedelta
+from urllib.parse import urlencode
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
@@ -105,3 +108,31 @@ def authenticate(header):
         raise ApiError("Ключ расширения недействителен или отозван.", 401)
     ExtensionToken.objects.filter(pk=token.pk).update(last_used_at=timezone.now())
     return ExtensionContext(token, member)
+
+
+REDIRECT = re.compile(r"^https://([a-p]{32})\.chromiumapp\.org/[A-Za-z0-9_/-]{0,100}$")
+STATE = re.compile(r"^[A-Za-z0-9_-]{8,128}$")
+
+
+def authorize_extension(actor, data):
+    """Вход расширения через CRM (chrome.identity.launchWebAuthFlow).
+
+    Ключ передаётся только на адрес расширения из CRM_EXTENSION_IDS в
+    фрагменте URL; браузер не отправляет фрагмент на сервер."""
+    redirect_uri = data.get("redirect_uri")
+    match = REDIRECT.match(redirect_uri) if isinstance(redirect_uri, str) else None
+    if not match or match.group(1) not in settings.EXTENSION_IDS:
+        raise ApiError("Это расширение не разрешено для подключения к CRM.", 403)
+    state = data.get("state")
+    if not isinstance(state, str) or not STATE.match(state):
+        raise ApiError("Некорректный запрос подключения расширения.")
+    company_id = identifier(data.get("company_id"))
+    token, secret = issue_token(actor, company_id, {"name": "Расширение браузера"})
+    fragment = urlencode(
+        {
+            "token": secret,
+            "state": state,
+            "company": token.organization.name,
+        }
+    )
+    return f"{redirect_uri}#{fragment}"

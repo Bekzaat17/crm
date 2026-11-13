@@ -39,6 +39,8 @@ class Conversation(models.Model):
     lead = models.ForeignKey(
         Lead, on_delete=models.PROTECT, related_name="conversations"
     )
+    # Галочка «Отслеживать»: расширение само передаёт новые сообщения чата.
+    tracking = models.BooleanField(default=True)
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

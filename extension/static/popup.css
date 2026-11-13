@@ -92,3 +92,30 @@ button.link {
 section[hidden] {
   display: none;
 }
+button.secondary {
+  background: #f4f6fb;
+  color: #0f172a;
+}
+.check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-weight: 600;
+}
+.check input {
+  width: auto;
+  margin: 0;
+}
+.ok {
+  color: #166534;
+  font-weight: 600;
+}
+.small {
+  font-size: 12px;
+}
+#login-form[hidden],
+#chat[hidden],
+#tracked[hidden],
+#untracked[hidden] {
+  display: none;
+}

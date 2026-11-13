@@ -1,9 +1,10 @@
 from django.http import JsonResponse
 
 from crm.core.http import endpoint
+from crm.core.throttle import throttle
 from crm.organizations.context import get_membership
 
-from . import tokens
+from . import tokens, tracking
 from .http import extension_endpoint
 from .selectors import lead_conversations, lead_search
 from .serializers import conversation_data, token_data
@@ -22,6 +23,14 @@ def extension_tokens(request, organization_id):
         return JsonResponse(token_data(token, secret), status=201)
     return JsonResponse(
         {"items": [token_data(t) for t in tokens.visible_tokens(member)[:50]]}
+    )
+
+
+@endpoint(["POST"], authenticated=True)
+def authorize_extension(request):
+    throttle("extension-authorize", str(request.user.pk), 20)
+    return JsonResponse(
+        {"redirect": tokens.authorize_extension(request.user, request.payload)}
     )
 
 
@@ -76,3 +85,36 @@ def ext_leads(request):
 def ext_import(request):
     result, created = import_fragment(request.extension, request.payload)
     return JsonResponse(result, status=201 if created else 200)
+
+
+@extension_endpoint(["GET"])
+def ext_lookup(request):
+    return JsonResponse(tracking.lookup(request.extension.member, request.GET))
+
+
+@extension_endpoint(["POST"])
+def ext_track(request):
+    return JsonResponse(tracking.track(request.extension, request.payload))
+
+
+@extension_endpoint(["POST"])
+def ext_untrack(request):
+    return JsonResponse(tracking.untrack(request.extension, request.payload))
+
+
+@extension_endpoint(["GET"])
+def ext_match(request):
+    leads = tracking.match_leads(request.extension.member, request.GET.get("phone"))
+    return JsonResponse(
+        {
+            "items": [
+                {
+                    "id": str(lead.id),
+                    "title": lead.title,
+                    "client_name": lead.client.name,
+                    "stage": lead.stage.name,
+                }
+                for lead in leads
+            ]
+        }
+    )

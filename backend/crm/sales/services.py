@@ -3,6 +3,7 @@
 from django.db import transaction
 
 from crm.core.errors import ApiError
+from crm.core.phones import phone_digits
 from crm.core.validation import clean_text, identifier, optional
 from crm.organizations import audit
 from crm.organizations.context import get_membership
@@ -47,10 +48,12 @@ def create_contact(actor, company_id, client_id, data):
 
 
 def _contact_fields(data):
+    phone = optional(data, "phone", 40)
     return dict(
         name=clean_text(data.get("name"), "Имя контакта", 240),
         relationship=clean_text(data.get("relationship"), "Кем приходится", 80),
-        phone=optional(data, "phone", 40),
+        phone=phone,
+        phone_digits=phone_digits(phone),
     )
 
 

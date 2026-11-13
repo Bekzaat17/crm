@@ -127,3 +127,12 @@ VAPID_PRIVATE_KEY = os.getenv("CRM_VAPID_PRIVATE_KEY", "")
 VAPID_SUBJECT = os.getenv("CRM_VAPID_SUBJECT", "mailto:noreply@localhost")
 # Письма со ссылками уходят через очередь; отправитель заменяется в тестах.
 CRM_MAILER = "crm.notifications.mail.OutboxMailer"
+
+# Расширения, которым CRM выдаёт доступ при входе (ID из chrome://extensions).
+EXTENSION_IDS = tuple(
+    x.strip()
+    for x in os.getenv("CRM_EXTENSION_IDS", "bmpbpohmpkpikemmocmchnhccmcneolc").split(
+        ","
+    )
+    if x.strip()
+)

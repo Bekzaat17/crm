@@ -1,12 +1,9 @@
 "use client";
-import { useState } from "react";
-import { KeyRound } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { useMutation } from "@/lib/use-mutation";
 import { useResource } from "@/lib/use-resource";
 import { ErrorAlert, LoadingState } from "@/components/ui/feedback";
-import { fields } from "@/components/ui/form";
 import { useCompany } from "@/components/workspace/company-context";
 
 type Token = {
@@ -17,14 +14,12 @@ type Token = {
   expires_at: string;
   last_used_at: string | null;
   revoked: boolean;
-  secret?: string;
 };
 
 export function ExtensionTokens() {
   const { root } = useCompany();
   const tokens = useResource<{ items: Token[] }>(`${root}/extension-tokens`);
   const action = useMutation(tokens.reload);
-  const [issued, setIssued] = useState<Token | null>(null);
   return (
     <article className="card">
       <div className="section-title">
@@ -40,38 +35,10 @@ export function ExtensionTokens() {
         message={tokens.error || action.error}
         onRetry={tokens.reload}
       />
-      {issued?.secret && (
-        <div className="alert success" role="status">
-          <KeyRound size={17} />
-          <div>
-            <strong>
-              Скопируйте ключ сейчас — он больше не будет показан.
-            </strong>
-            <code className="secret-value">{issued.secret}</code>
-          </div>
-        </div>
-      )}
-      <form
-        className="inline-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const data = fields(e.currentTarget);
-          void action.run(async () =>
-            setIssued(await api<Token>(`${root}/extension-tokens`, data)),
-          );
-        }}
-      >
-        <input
-          name="name"
-          required
-          maxLength={80}
-          defaultValue="Рабочий браузер"
-          aria-label="Название ключа"
-        />
-        <button className="button primary" disabled={action.busy}>
-          Выдать ключ
-        </button>
-      </form>
+      <p className="small form-note">
+        Подключение: установите расширение и нажмите в нём «Войти в RehubPro
+        CRM». Ниже — подключённые браузеры, доступ любого можно отозвать.
+      </p>
       {!tokens.data ? (
         <LoadingState />
       ) : (
