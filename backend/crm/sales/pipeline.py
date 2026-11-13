@@ -19,7 +19,7 @@ from crm.organizations import audit
 from crm.organizations.context import get_membership
 from crm.organizations.permissions import Perm
 
-from .models import Lead, LeadActivity, PipelineStage
+from .models import Lead, LeadActivity, LeadStageChange, PipelineStage
 
 Kind = PipelineStage.Kind
 MAX_STAGES = 30
@@ -195,6 +195,10 @@ def archive_stage(actor, company_id, stage_id, data):
                 kind="changed",
                 text=f"Этап: {stage.name} → {target.name} (этап архивирован)",
             )
+            for pk in moved
+        )
+        LeadStageChange.objects.bulk_create(
+            LeadStageChange(lead_id=pk, from_stage=stage, to_stage=target, actor=actor)
             for pk in moved
         )
     stage.is_active = False

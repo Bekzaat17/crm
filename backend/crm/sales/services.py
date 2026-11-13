@@ -11,7 +11,7 @@ from crm.organizations.models import Branch, Membership
 from crm.organizations.permissions import Perm, can
 
 from .lead_changes import ChangeContext, apply_changes
-from .models import Client, Lead, LeadActivity, RelatedContact
+from .models import Client, Lead, LeadActivity, LeadStageChange, RelatedContact
 from .pipeline import initial_stage
 from .selectors import find_client, find_lead
 from .validation import client_fields
@@ -147,6 +147,7 @@ def create_lead(actor, company_id, data):
     LeadActivity.objects.create(
         lead=lead, actor=actor, kind="created", text="Обращение создано"
     )
+    LeadStageChange.objects.create(lead=lead, to_stage=lead.stage, actor=actor)
     return lead
 
 
@@ -157,11 +158,19 @@ def update_lead(actor, company_id, lead_id, data):
     member = get_membership(actor, company_id, lock="assignee_id" in data)
     lead = find_lead(member, lead_id, lock=True)
     require_version(lead, data, "Обращение изменилось. Откройте его заново.")
+    previous_stage_id = lead.stage_id
     changes = apply_changes(
         lead, data, ChangeContext(member, company_id, company_assignee)
     )
     lead.version += 1
     lead.save()
+    if lead.stage_id != previous_stage_id:
+        LeadStageChange.objects.create(
+            lead=lead,
+            from_stage_id=previous_stage_id,
+            to_stage_id=lead.stage_id,
+            actor=actor,
+        )
     if changes:
         LeadActivity.objects.create(
             lead=lead, actor=actor, kind="changed", text="; ".join(changes)

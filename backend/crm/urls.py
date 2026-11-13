@@ -4,6 +4,7 @@ from django.urls import include, path
 urlpatterns = [
     path("", include("crm.integrations.urls")),
     path("", include("crm.work.urls")),
+    path("", include("crm.analytics.urls")),
     path("", include("crm.sales.urls")),
     path("", include("crm.accounts.urls")),
     path("", include("crm.organizations.urls")),

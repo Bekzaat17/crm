@@ -1,6 +1,7 @@
 import uuid
 
 from django.db import models
+from django.utils import timezone
 
 from crm.accounts.models import User
 from crm.organizations.models import Branch, Membership, Organization
@@ -115,3 +116,27 @@ class LeadActivity(models.Model):
     kind = models.CharField(max_length=20)
     text = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class LeadStageChange(models.Model):
+    """Переход обращения между этапами — основа аналитики воронки.
+
+    Пишется при создании (from_stage пуст), переносе и архивировании этапа.
+    История не редактируется: аналитика за прошлые периоды не должна меняться.
+    """
+
+    id = models.BigAutoField(primary_key=True)
+    lead = models.ForeignKey(
+        Lead, on_delete=models.CASCADE, related_name="stage_changes"
+    )
+    from_stage = models.ForeignKey(
+        PipelineStage, on_delete=models.PROTECT, null=True, related_name="+"
+    )
+    to_stage = models.ForeignKey(
+        PipelineStage, on_delete=models.PROTECT, related_name="+"
+    )
+    actor = models.ForeignKey(User, on_delete=models.PROTECT)
+    at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        indexes = [models.Index(fields=["lead", "at"])]

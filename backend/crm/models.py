@@ -29,6 +29,7 @@ from crm.sales.models import (
     Client,
     Lead,
     LeadActivity,
+    LeadStageChange,
     PipelineStage,
     RelatedContact,
 )
@@ -55,6 +56,7 @@ __all__ = [
     "Invitation",
     "Lead",
     "LeadActivity",
+    "LeadStageChange",
     "Membership",
     "Organization",
     "PipelineStage",

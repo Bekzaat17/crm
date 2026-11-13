@@ -1,5 +1,6 @@
 import {
   Activity,
+  BarChart3,
   CheckSquare,
   Layers3,
   LayoutDashboard,
@@ -44,6 +45,13 @@ export const NAVIGATION: NavItem[] = [
     label: "Задачи",
     description: "Задачи менеджеров, сроки и следующие контакты.",
     icon: CheckSquare,
+  },
+  {
+    path: "/analytics",
+    label: "Аналитика",
+    description:
+      "Новые обращения, поступления, отказы, воронка и работа сотрудников.",
+    icon: BarChart3,
   },
   {
     path: "/team",
