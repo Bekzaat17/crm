@@ -10,7 +10,13 @@ def client_data(c, detail=False):
     )
     if detail:
         data["contacts"] = [
-            dict(id=str(r.id), name=r.name, phone=r.phone, relationship=r.relationship)
+            dict(
+                id=str(r.id),
+                name=r.name,
+                phone=r.phone,
+                relationship=r.relationship,
+                version=r.version,
+            )
             for r in c.contacts.order_by("name")
         ]
     return data

@@ -8,10 +8,16 @@ from crm.core.http import endpoint
 from crm.core.throttle import client_throttle, throttle
 from crm.core.validation import clean_text
 
-from . import selectors, services
+from . import branches, selectors, services
 from .context import get_membership
-from .permissions import Perm
-from .serializers import event_data, invitation_data, member_data, organization_data
+from .permissions import Perm, can
+from .serializers import (
+    branch_data,
+    event_data,
+    invitation_data,
+    member_data,
+    organization_data,
+)
 
 
 @endpoint(["GET"], authenticated=True)
@@ -23,12 +29,12 @@ def organization(request, organization_id):
 
 @endpoint(["GET"], authenticated=True)
 def team(request, organization_id):
-    get_membership(request.user, organization_id, Perm.MANAGE_TEAM)
+    viewer = get_membership(request.user, organization_id, Perm.MANAGE_TEAM)
     now = timezone.now()
     return JsonResponse(
         {
             "members": [
-                member_data(m) for m in selectors.team_members(organization_id)
+                member_data(m, viewer) for m in selectors.team_members(organization_id)
             ],
             "invitations": [
                 invitation_data(i, now)
@@ -103,3 +109,55 @@ def audit(request, organization_id):
     return JsonResponse(
         {"events": [event_data(e) for e in selectors.recent_events(organization_id)]}
     )
+
+
+@endpoint(["POST"], authenticated=True)
+def change_role(request, organization_id, membership_id):
+    member = services.change_role(
+        request.user, organization_id, membership_id, request.payload
+    )
+    return JsonResponse(member_data(member))
+
+
+@endpoint(["POST"], authenticated=True)
+def transfer_ownership(request, organization_id):
+    throttle("ownership-user", str(request.user.pk), 10)
+    services.transfer_ownership(request.user, organization_id, request.payload)
+    return JsonResponse({"message": "Владение компанией передано."})
+
+
+@endpoint(["GET", "POST"], authenticated=True)
+def branch_list(request, organization_id):
+    member = get_membership(request.user, organization_id)
+    if request.method == "POST":
+        branch = branches.create_branch(request.user, organization_id, request.payload)
+        return JsonResponse(branch_data(branch), status=201)
+    archived = can(member, Perm.MANAGE_BRANCHES) and request.GET.get("archived") == "1"
+    return JsonResponse(
+        {
+            "items": [
+                branch_data(b)
+                for b in branches.company_branches(organization_id, archived)
+            ]
+        }
+    )
+
+
+@endpoint(["POST"], authenticated=True)
+def edit_branch(request, organization_id, branch_id):
+    branch = branches.rename_branch(
+        request.user, organization_id, branch_id, request.payload
+    )
+    return JsonResponse(branch_data(branch))
+
+
+@endpoint(["POST"], authenticated=True)
+def archive_branch(request, organization_id, branch_id):
+    branch = branches.set_branch_active(request.user, organization_id, branch_id, False)
+    return JsonResponse(branch_data(branch))
+
+
+@endpoint(["POST"], authenticated=True)
+def restore_branch(request, organization_id, branch_id):
+    branch = branches.set_branch_active(request.user, organization_id, branch_id, True)
+    return JsonResponse(branch_data(branch))

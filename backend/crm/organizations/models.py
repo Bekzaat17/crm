@@ -36,6 +36,12 @@ class Membership(models.Model):
                 condition=models.Q(role__in=["owner", "admin", "lead", "manager"]),
                 name="crm_valid_role",
             ),
+            # Один действующий владелец: передача владения меняет роли в транзакции.
+            models.UniqueConstraint(
+                fields=["organization"],
+                condition=models.Q(role="owner", is_active=True),
+                name="crm_single_active_owner",
+            ),
         ]
 
 
@@ -45,6 +51,8 @@ class Branch(models.Model):
         Organization, on_delete=models.CASCADE, related_name="branches"
     )
     name = models.CharField("Название филиала", max_length=160)
+    is_active = models.BooleanField(default=True)
+    version = models.PositiveIntegerField(default=1)
 
     class Meta:
         constraints = [

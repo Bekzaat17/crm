@@ -29,7 +29,7 @@ def metadata(request, organization_id):
             "branches": [
                 dict(id=str(b.id), name=b.name)
                 for b in Branch.objects.filter(
-                    organization_id=organization_id
+                    organization_id=organization_id, is_active=True
                 ).order_by("name")
             ],
             "can_assign": can(m, Perm.ASSIGN_LEADS),
@@ -204,3 +204,17 @@ def restore_stage(request, organization_id, stage_id):
     return JsonResponse(
         stage_data(pipeline.restore_stage(request.user, organization_id, stage_id))
     )
+
+
+@endpoint(["POST"], authenticated=True)
+def edit_contact(request, organization_id, client_id, contact_id):
+    contact = services.update_contact(
+        request.user, organization_id, client_id, contact_id, request.payload
+    )
+    return JsonResponse({"id": str(contact.id), "version": contact.version})
+
+
+@endpoint(["POST"], authenticated=True)
+def delete_contact(request, organization_id, client_id, contact_id):
+    services.delete_contact(request.user, organization_id, client_id, contact_id)
+    return JsonResponse({"message": "Контактное лицо удалено."})

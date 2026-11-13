@@ -2,7 +2,7 @@ from django.utils import timezone
 
 from . import audit
 from .models import Membership
-from .permissions import Perm, can, granted
+from .permissions import Perm, assignable_roles, can, granted, policy_for
 
 
 def company_data(membership):
@@ -21,15 +21,32 @@ def organization_data(membership):
         "permissions": granted(membership),
         "can_manage_team": can(membership, Perm.MANAGE_TEAM),
         "branches": [
-            {"id": str(b.id), "name": b.name} for b in org.branches.order_by("name")
+            branch_data(b) for b in org.branches.filter(is_active=True).order_by("name")
         ],
+        "assignable_roles": assignable_roles(membership),
         "member_count": org.memberships.filter(is_active=True).count(),
         "created_at": org.created_at.isoformat(),
     }
 
 
-def member_data(m: Membership):
+def branch_data(branch):
     return {
+        "id": str(branch.id),
+        "name": branch.name,
+        "is_active": branch.is_active,
+        "version": branch.version,
+    }
+
+
+def member_data(m: Membership, viewer: Membership | None = None):
+    manageable = bool(
+        viewer
+        and m.is_active
+        and m.user_id != viewer.user_id
+        and policy_for(viewer).manages(m.role)
+    )
+    return {
+        "manageable": manageable,
         "id": str(m.id),
         "user_id": str(m.user_id),
         "name": m.user.name,

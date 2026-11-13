@@ -10,13 +10,13 @@ from crm.accounts.passwords import check_password
 from crm.core.errors import ApiError
 from crm.core.mail import Mailer, default_mailer
 from crm.core.tokens import digest, new_token
-from crm.core.validation import clean_email, clean_text
+from crm.core.validation import clean_email, clean_text, identifier
 
 from . import audit
 from .context import get_membership
 from .emails import invitation_email
 from .models import Branch, Invitation, Membership, Organization
-from .permissions import Perm
+from .permissions import Perm, require_manages
 
 INVITABLE_ROLES = (
     Membership.Role.ADMIN,
@@ -45,6 +45,9 @@ def invite_member(actor, organization_id, data, mailer: Mailer | None = None):
     role = data.get("role")
     if role not in INVITABLE_ROLES:
         raise ApiError("Выберите роль администратора, руководителя или менеджера.")
+    require_manages(
+        membership, role, "Администратора может пригласить только владелец."
+    )
     if Membership.objects.filter(
         organization=organization, user__email__iexact=email, is_active=True
     ).exists():
@@ -144,21 +147,75 @@ def revoke_invitation(actor, organization_id, invitation_id):
     audit.record(organization_id, actor, "invitation.revoked", invitation.id)
 
 
-@transaction.atomic
-def deactivate_member(actor, organization_id, membership_id):
-    get_membership(actor, organization_id, Perm.MANAGE_TEAM, lock=True)
+def _team_member(organization_id, membership_id):
     target = (
         Membership.objects.select_for_update()
+        .select_related("user")
         .filter(pk=membership_id, organization_id=organization_id)
         .first()
     )
     if not target:
         raise ApiError("Сотрудник не найден.", 404)
+    return target
+
+
+@transaction.atomic
+def deactivate_member(actor, organization_id, membership_id):
+    actor_member = get_membership(actor, organization_id, Perm.MANAGE_TEAM, lock=True)
+    target = _team_member(organization_id, membership_id)
     if target.role == Membership.Role.OWNER or target.user_id == actor.pk:
         raise ApiError(
             "Владельца и собственный доступ нельзя отключить через управление командой.",
             403,
         )
+    require_manages(
+        actor_member, target.role, "Администратора может отключить только владелец."
+    )
     target.is_active = False
     target.save(update_fields=["is_active"])
     audit.record(organization_id, actor, "membership.deactivated", target.id)
+
+
+@transaction.atomic
+def change_role(actor, organization_id, membership_id, data):
+    actor_member = get_membership(actor, organization_id, Perm.MANAGE_ROLES, lock=True)
+    target = _team_member(organization_id, membership_id)
+    role = data.get("role")
+    if role not in INVITABLE_ROLES:
+        raise ApiError("Выберите роль администратора, руководителя или менеджера.")
+    if target.user_id == actor.pk:
+        raise ApiError("Собственную роль изменить нельзя.", 403)
+    if not target.is_active:
+        raise ApiError("Доступ сотрудника отключён.", 409)
+    message = "Недостаточно прав для изменения роли этого сотрудника."
+    require_manages(actor_member, target.role, message)
+    require_manages(actor_member, role, message)
+    if target.role != role:
+        target.role = role
+        target.save(update_fields=["role"])
+        audit.record(organization_id, actor, "membership.role_changed", target.id)
+    return target
+
+
+@transaction.atomic
+def transfer_ownership(actor, organization_id, data):
+    """Владелец передаёт компанию активному сотруднику и становится администратором.
+
+    Требует текущий пароль. Блокировка компании и уникальный индекс владельца
+    исключают двух владельцев при параллельных запросах.
+    """
+    owner = get_membership(actor, organization_id, Perm.TRANSFER_OWNERSHIP, lock=True)
+    password = data.get("password")
+    if not isinstance(password, str) or not actor.check_password(password):
+        raise ApiError("Неверный пароль.", 403)
+    target = _team_member(organization_id, identifier(data.get("membership_id")))
+    if target.pk == owner.pk:
+        raise ApiError("Вы уже владелец компании.", 409)
+    if not target.is_active:
+        raise ApiError("Доступ сотрудника отключён.", 409)
+    owner.role = Membership.Role.ADMIN
+    owner.save(update_fields=["role"])
+    target.role = Membership.Role.OWNER
+    target.save(update_fields=["role"])
+    audit.record(organization_id, actor, "ownership.transferred", target.id)
+    return target

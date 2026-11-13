@@ -17,4 +17,22 @@ urlpatterns = [
         "organizations/<uuid:organization_id>/members/<uuid:membership_id>/deactivate/",
         views.deactivate_member,
     ),
+    path(
+        "organizations/<uuid:organization_id>/members/<uuid:membership_id>/role/",
+        views.change_role,
+    ),
+    path("organizations/<uuid:organization_id>/ownership/", views.transfer_ownership),
+    path("organizations/<uuid:organization_id>/branches/", views.branch_list),
+    path(
+        "organizations/<uuid:organization_id>/branches/<uuid:branch_id>/",
+        views.edit_branch,
+    ),
+    path(
+        "organizations/<uuid:organization_id>/branches/<uuid:branch_id>/archive/",
+        views.archive_branch,
+    ),
+    path(
+        "organizations/<uuid:organization_id>/branches/<uuid:branch_id>/restore/",
+        views.restore_branch,
+    ),
 ]

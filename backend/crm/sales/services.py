@@ -4,6 +4,7 @@ from django.db import transaction
 
 from crm.core.errors import ApiError
 from crm.core.validation import clean_text, identifier, optional
+from crm.organizations import audit
 from crm.organizations.context import get_membership
 from crm.organizations.models import Branch, Membership
 from crm.organizations.permissions import Perm, can
@@ -42,12 +43,49 @@ def update_client(actor, company_id, client_id, data):
 def create_contact(actor, company_id, client_id, data):
     member = get_membership(actor, company_id)
     client = find_client(member, client_id)
-    return RelatedContact.objects.create(
-        client=client,
+    return RelatedContact.objects.create(client=client, **_contact_fields(data))
+
+
+def _contact_fields(data):
+    return dict(
         name=clean_text(data.get("name"), "Имя контакта", 240),
         relationship=clean_text(data.get("relationship"), "Кем приходится", 80),
         phone=optional(data, "phone", 40),
     )
+
+
+def _find_contact(member, client_id, contact_id):
+    # Контакт наследует границу доступа карточки клиента.
+    client = find_client(member, client_id, lock=True)
+    contact = (
+        RelatedContact.objects.select_for_update()
+        .filter(pk=identifier(contact_id), client=client)
+        .first()
+    )
+    if not contact:
+        raise ApiError("Контактное лицо не найдено.", 404)
+    return contact
+
+
+@transaction.atomic
+def update_contact(actor, company_id, client_id, contact_id, data):
+    member = get_membership(actor, company_id)
+    contact = _find_contact(member, client_id, contact_id)
+    require_version(contact, data, "Контакт изменился. Откройте карточку заново.")
+    for key, value in _contact_fields(data).items():
+        setattr(contact, key, value)
+    contact.version += 1
+    contact.save()
+    audit.record(company_id, actor, "contact.updated", contact.id)
+    return contact
+
+
+@transaction.atomic
+def delete_contact(actor, company_id, client_id, contact_id):
+    member = get_membership(actor, company_id)
+    contact = _find_contact(member, client_id, contact_id)
+    audit.record(company_id, actor, "contact.deleted", contact.id)
+    contact.delete()
 
 
 def company_assignee(company_id, value):
@@ -69,6 +107,8 @@ def company_branch(company_id, value):
     ).first()
     if not branch:
         raise ApiError("Филиал должен принадлежать этой компании.")
+    if not branch.is_active:
+        raise ApiError("Филиал в архиве. Выберите действующий филиал.")
     return branch
 
 

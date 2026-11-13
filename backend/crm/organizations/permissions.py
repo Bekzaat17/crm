@@ -77,17 +77,28 @@ class AssignedScope:
 class RolePolicy:
     permissions: frozenset
     scope: LeadScope
+    # Роли сотрудников, которых эта роль может приглашать, назначать и отключать.
+    manageable_roles: frozenset = frozenset()
 
     def can(self, perm: Perm) -> bool:
         return perm in self.permissions
+
+    def manages(self, role) -> bool:
+        return role in self.manageable_roles
 
 
 _ALL = frozenset(Perm)
 _LEAD = frozenset({Perm.VIEW_ALL_LEADS, Perm.ASSIGN_LEADS, Perm.SEND_ADMISSIONS})
 
+_STAFF = frozenset({Membership.Role.LEAD, Membership.Role.MANAGER})
+
 POLICIES = {
-    Membership.Role.OWNER: RolePolicy(_ALL, CompanyScope()),
-    Membership.Role.ADMIN: RolePolicy(_ALL - {Perm.TRANSFER_OWNERSHIP}, CompanyScope()),
+    Membership.Role.OWNER: RolePolicy(
+        _ALL, CompanyScope(), _STAFF | {Membership.Role.ADMIN}
+    ),
+    Membership.Role.ADMIN: RolePolicy(
+        _ALL - {Perm.TRANSFER_OWNERSHIP}, CompanyScope(), _STAFF
+    ),
     Membership.Role.LEAD: RolePolicy(_LEAD, CompanyScope()),
     Membership.Role.MANAGER: RolePolicy(frozenset(), AssignedScope()),
 }
@@ -104,6 +115,17 @@ def can(member: Membership, perm: Perm) -> bool:
 def require(member: Membership, perm: Perm, message: str | None = None):
     if not can(member, perm):
         raise ApiError(message or DENIED[perm], 403)
+
+
+def require_manages(member: Membership, role, message: str):
+    """Владелец управляет всеми сотрудниками, администратор — руководителями
+    и менеджерами. Роль владельца назначается только передачей владения."""
+    if not policy_for(member).manages(role):
+        raise ApiError(message, 403)
+
+
+def assignable_roles(member: Membership) -> list[str]:
+    return [r.value for r in Membership.Role if policy_for(member).manages(r)]
 
 
 def granted(member: Membership) -> list[str]:

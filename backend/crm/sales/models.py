@@ -28,6 +28,7 @@ class RelatedContact(models.Model):
     name = models.CharField(max_length=240)
     relationship = models.CharField(max_length=80)
     phone = models.CharField(max_length=40, blank=True)
+    version = models.PositiveIntegerField(default=1)
 
 
 class PipelineStage(models.Model):
