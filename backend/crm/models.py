@@ -1,6 +1,12 @@
 """Реестр моделей приложения crm. Модели принадлежат доменным пакетам."""
 
 from crm.accounts.models import Registration, User, UserManager
+from crm.conversations.models import (
+    Conversation,
+    ExtensionToken,
+    ImportBatch,
+    Message,
+)
 from crm.core.models import RateLimitBucket
 from crm.integrations.models import AdmissionTransfer, DeliveryAttempt, RehubCenter
 from crm.notifications.models import (
@@ -29,6 +35,10 @@ from crm.sales.models import (
 from crm.work.models import FollowUpTask
 
 __all__ = [
+    "Conversation",
+    "ExtensionToken",
+    "ImportBatch",
+    "Message",
     "NotificationPreference",
     "OutboundMessage",
     "PushSubscription",

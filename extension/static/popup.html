@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <title>Передать в CRM</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <strong>RehubPro CRM</strong>
+      <button id="toggle-settings" type="button" class="link">Настройки</button>
+    </header>
+    <p id="account" class="muted"></p>
+    <form id="settings-form" hidden>
+      <div>
+        <label
+          >Адрес CRM
+          <input
+            id="crm-url"
+            type="url"
+            required
+            placeholder="https://crm.rehubpro.kz"
+        /></label>
+        <label
+          >Ключ расширения
+          <input id="key" type="password" required autocomplete="off"
+        /></label>
+        <button type="submit">Сохранить</button>
+      </div>
+    </form>
+    <section id="preview" hidden>
+      <h2 id="conversation"></h2>
+      <ul id="messages" class="messages"></ul>
+      <ul id="warnings" class="warnings"></ul>
+      <label
+        >Обращение
+        <input id="lead-search" placeholder="Поиск по клиенту или названию"
+      /></label>
+      <select id="lead" aria-label="Обращение"></select>
+      <button id="send" type="button" disabled>Передать в CRM</button>
+    </section>
+    <p id="status" class="status" role="status"></p>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

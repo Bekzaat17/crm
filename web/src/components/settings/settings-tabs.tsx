@@ -10,6 +10,7 @@ const TABS: { path: string; label: string; perm?: Perm }[] = [
   { path: "/pipeline", label: "Этапы воронки", perm: "manage_pipeline" },
   { path: "/centers", label: "Центры RehubPro", perm: "manage_centers" },
   { path: "/notifications", label: "Уведомления" },
+  { path: "/extension", label: "Расширение браузера" },
 ];
 
 export function SettingsTabs({ children }: { children: React.ReactNode }) {

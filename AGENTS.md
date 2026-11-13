@@ -8,7 +8,10 @@
 - `backend/crm/core` — общий слой без домена: ошибки, HTTP-обёртка `endpoint`, валидация, токены, лимиты, письма.
 - `backend/crm/accounts` — пользователи, регистрация, вход и восстановление пароля.
 - `backend/crm/organizations` — компании, членства, филиалы, приглашения, аудит, права ролей (`permissions.py`) и контекст компании (`context.get_membership`).
-- `backend/crm/sales`, `work`, `integrations` — клиенты и обращения, задачи и сводка, передача в RehubPro.
+- `backend/crm/sales`, `work`, `integrations` — клиенты, обращения и этапы воронки, задачи и сводка, передача в RehubPro.
+- `backend/crm/notifications` — очередь сообщений, каналы (почта, Telegram, Web Push), напоминания.
+- `backend/crm/conversations` — ключи расширения и импорт переписки (API `/api/ext/`, только Bearer-ключ).
+- `extension` — расширение Chrome MV3 (TypeScript, адаптеры мессенджеров).
 - `backend/crm/models.py` — только реестр моделей доменных пакетов (одно Django-приложение `crm`, миграции общие).
 - `web/src` — Next.js App Router и TypeScript.
 - `docs/PLAN.md` — последовательность работ и модель предметной области.
@@ -25,7 +28,7 @@
 
 Из `backend`: `../.venv/bin/python manage.py check`, `../.venv/bin/python manage.py makemigrations --check --dry-run`, `../.venv/bin/python manage.py test crm.tests`.
 
-Из `web`: `npm run typecheck` и `npm run build`. Сохранять зафиксированные зависимости и lock-файлы. Прочитать применимые инструкции `web/AGENTS.md` и документацию установленного Next.js перед изменением поведения framework.
+Из `web`: `npm run typecheck` и `npm run build`. Из `extension`: `npm run typecheck`. Сохранять зафиксированные зависимости и lock-файлы. Прочитать применимые инструкции `web/AGENTS.md` и документацию установленного Next.js перед изменением поведения framework.
 
 PostgreSQL CRM запускается отдельным `docker compose up -d db`; её тесты создают и удаляют только `test_rehubpro_crm`. Не использовать БД RehubPro и не запускать команды удаления volumes для очистки тестов.
 
@@ -34,6 +37,10 @@ PostgreSQL CRM запускается отдельным `docker compose up -d d
 Соблюдать SOLID, DRY и KISS. Каждый домен — пакет `crm/<домен>/` с models, services (бизнес-операции), selectors (правила видимости), serializers (ответ), views и urls. Права проверять через `organizations.permissions` (`Perm`, `require`, `can`), а не сравнением строк ролей; видимость обращений задаёт стратегия роли. Не дублировать проверки доступа в каждом экране и не переносить их только в интерфейс. Применять паттерны при наличии задачи, а не создавать универсальные фабрики, репозитории и интерфейсы без конкретной необходимости. Подробности в `docs/ARCHITECTURE.md`.
 
 Форматирование и статические проверки: Ruff для Python, Prettier для TypeScript и CSS. Новые редакторы делать небольшими компонентами с явными типами входных данных.
+
+## Уведомления и переписка
+
+Очереди в БД используют `crm/core/outbox.py`. Содержимое сообщений шифровать и стирать после отправки; в текст уведомлений не включать данные клиента. Токены Telegram и ключи расширения не выводить в логи и ответы; ключи хранить хешем. Не отключать CSRF для кабинета: исключение только для `/api/ext/`, где нет cookie-аутентификации. Не объединять собеседников с клиентами автоматически.
 
 ## Доставка клиентов
 

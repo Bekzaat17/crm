@@ -401,3 +401,41 @@ td select {
 .settings-row > svg {
   color: var(--primary);
 }
+.secret-value {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.conversation summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.chat {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+.chat-message {
+  max-width: 78%;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--canvas);
+  border: 1px solid var(--line);
+}
+.chat-message p {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.chat-out {
+  align-self: flex-end;
+  background: var(--primary-tint);
+}

@@ -8,4 +8,5 @@ urlpatterns = [
     path("", include("crm.accounts.urls")),
     path("", include("crm.organizations.urls")),
     path("", include("crm.notifications.urls")),
+    path("", include("crm.conversations.urls")),
 ]

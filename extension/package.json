@@ -1,0 +1,14 @@
+{
+  "name": "rehubpro-crm-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p . && node scripts/copy-static.mjs",
+    "typecheck": "tsc -p . --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "0.3.7",
+    "typescript": "5.9.3"
+  }
+}

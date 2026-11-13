@@ -1,0 +1,94 @@
+body {
+  width: 340px;
+  margin: 0;
+  padding: 14px;
+  font:
+    13px system-ui,
+    sans-serif;
+  color: #0f172a;
+}
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+h2 {
+  font-size: 14px;
+  margin: 12px 0 8px;
+}
+label {
+  display: block;
+  margin: 8px 0 4px;
+  font-weight: 600;
+}
+input,
+select {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 7px 9px;
+  margin-top: 4px;
+  border: 1px solid #e5e9f0;
+  border-radius: 7px;
+  font: inherit;
+}
+button {
+  margin-top: 10px;
+  width: 100%;
+  padding: 9px;
+  border: 0;
+  border-radius: 8px;
+  background: #2563eb;
+  color: white;
+  font: inherit;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+button.link {
+  width: auto;
+  margin: 0;
+  padding: 0;
+  background: none;
+  color: #2563eb;
+}
+.muted {
+  color: #64748b;
+  margin: 4px 0;
+}
+.messages {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 160px;
+  overflow: auto;
+}
+.messages li {
+  margin: 4px 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: #f4f6fb;
+  max-width: 85%;
+}
+.messages li.out {
+  margin-left: auto;
+  background: #eff6ff;
+}
+.warnings {
+  padding-left: 18px;
+  color: #92400e;
+  font-size: 12px;
+}
+.status {
+  margin-top: 10px;
+  color: #334155;
+}
+.status.error {
+  color: #b91c1c;
+}
+#settings-form[hidden],
+#settings[hidden],
+section[hidden] {
+  display: none;
+}

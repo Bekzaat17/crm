@@ -9,6 +9,7 @@ import { PageHeading } from "@/components/ui/page-heading";
 import { Admission } from "@/components/integrations/admission";
 import { useCompany } from "@/components/workspace/company-context";
 import { LeadActivity } from "./lead-activity";
+import { LeadConversations } from "./lead-conversations";
 import { LeadForm } from "./lead-form";
 
 export function LeadDetail() {
@@ -55,6 +56,7 @@ export function LeadDetail() {
           onSaved={lead.reload}
         />
       </article>
+      <LeadConversations path={`${root}/leads/${record.id}/conversations`} />
       <LeadActivity root={root} lead={record} onChanged={lead.reload} />
     </>
   );

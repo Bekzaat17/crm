@@ -14,6 +14,8 @@ LABELS = {
     "branch.restored": "Филиал восстановлен",
     "contact.updated": "Изменено контактное лицо",
     "contact.deleted": "Удалено контактное лицо",
+    "extension_token.created": "Выдан ключ расширения браузера",
+    "extension_token.revoked": "Отозван ключ расширения браузера",
     "center.created": "Добавлен центр",
     "center.updated": "Изменён центр",
     "transfer.retried": "Повторена передача",
