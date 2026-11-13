@@ -20,6 +20,7 @@ class Perm(str, Enum):
     MANAGE_TEAM = "manage_team"
     MANAGE_ROLES = "manage_roles"
     MANAGE_BRANCHES = "manage_branches"
+    MANAGE_PIPELINE = "manage_pipeline"
     MANAGE_CENTERS = "manage_centers"
     VIEW_AUDIT = "view_audit"
     VIEW_ALL_LEADS = "view_all_leads"
@@ -32,6 +33,7 @@ DENIED = {
     Perm.MANAGE_TEAM: "Управлять командой может владелец или администратор.",
     Perm.MANAGE_ROLES: "Менять роли может владелец или администратор.",
     Perm.MANAGE_BRANCHES: "Управлять филиалами может владелец или администратор.",
+    Perm.MANAGE_PIPELINE: "Настраивать воронку может владелец или администратор.",
     Perm.MANAGE_CENTERS: "Управлять командой может владелец или администратор.",
     Perm.VIEW_AUDIT: "Управлять командой может владелец или администратор.",
     Perm.VIEW_ALL_LEADS: "Недостаточно прав для просмотра обращений компании.",

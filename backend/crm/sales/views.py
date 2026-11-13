@@ -1,16 +1,14 @@
 from django.db.models import Count, Q
 from django.http import JsonResponse
 
-from crm.core.errors import ApiError
 from crm.core.http import endpoint
 from crm.organizations.context import get_membership
 from crm.organizations.models import Branch, Membership
 from crm.organizations.permissions import Perm, can
 
-from . import services
-from .models import Lead
+from . import pipeline, services
 from .selectors import clients_for, find_client, find_lead, leads_for, page
-from .serializers import client_data, lead_data
+from .serializers import client_data, lead_data, stage_data
 
 
 @endpoint(["GET"], authenticated=True)
@@ -23,7 +21,7 @@ def metadata(request, organization_id):
         staff = staff.filter(pk=m.pk)
     return JsonResponse(
         {
-            "stages": [dict(id=k, name=v) for k, v in Lead.Stage.choices],
+            "stages": [stage_data(s) for s in pipeline.active_stages(organization_id)],
             "assignees": [
                 dict(id=str(x.id), name=x.user.name)
                 for x in staff.order_by("user__name")
@@ -36,6 +34,7 @@ def metadata(request, organization_id):
             ],
             "can_assign": can(m, Perm.ASSIGN_LEADS),
             "can_send": can(m, Perm.SEND_ADMISSIONS),
+            "can_manage_pipeline": can(m, Perm.MANAGE_PIPELINE),
         }
     )
 
@@ -83,7 +82,7 @@ def client_detail(request, organization_id, client_id):
         lead_data(x)
         for x in leads_for(m)
         .filter(client=client)
-        .select_related("client", "assignee__user")
+        .select_related("client", "assignee__user", "stage")
         .order_by("-created_at")
     ]
     return JsonResponse(result)
@@ -117,12 +116,14 @@ def leads(request, organization_id):
         )
     stage = request.GET.get("stage", "")
     if stage:
-        if stage not in Lead.Stage.values:
-            raise ApiError("Неизвестный этап.")
-        qs = qs.filter(stage=stage)
-    counts = {x["stage"]: x["n"] for x in qs.values("stage").annotate(n=Count("id"))}
+        qs = qs.filter(stage=pipeline.find_stage(organization_id, stage, active=False))
+    counts = {
+        str(x["stage"]): x["n"] for x in qs.values("stage").annotate(n=Count("id"))
+    }
     rows, total, more = page(
-        qs.select_related("client", "assignee__user").order_by("-updated_at", "id"),
+        qs.select_related("client", "assignee__user", "stage").order_by(
+            "-updated_at", "id"
+        ),
         request.GET.get("page", "1"),
     )
     return JsonResponse(
@@ -163,3 +164,43 @@ def lead_detail(request, organization_id, lead_id):
 def comment(request, organization_id, lead_id):
     services.add_comment(request.user, organization_id, lead_id, request.payload)
     return JsonResponse({"message": "Комментарий добавлен."}, status=201)
+
+
+@endpoint(["GET", "POST"], authenticated=True)
+def stages(request, organization_id):
+    get_membership(request.user, organization_id, Perm.MANAGE_PIPELINE)
+    if request.method == "POST":
+        stage = pipeline.create_stage(request.user, organization_id, request.payload)
+        return JsonResponse(stage_data(stage), status=201)
+    return JsonResponse(
+        {"items": [stage_data(s) for s in pipeline.all_stages(organization_id)]}
+    )
+
+
+@endpoint(["POST"], authenticated=True)
+def edit_stage(request, organization_id, stage_id):
+    stage = pipeline.update_stage(
+        request.user, organization_id, stage_id, request.payload
+    )
+    return JsonResponse(stage_data(stage))
+
+
+@endpoint(["POST"], authenticated=True)
+def reorder_stages(request, organization_id):
+    items = pipeline.reorder_stages(request.user, organization_id, request.payload)
+    return JsonResponse({"items": [stage_data(s) for s in items]})
+
+
+@endpoint(["POST"], authenticated=True)
+def archive_stage(request, organization_id, stage_id):
+    stage, moved = pipeline.archive_stage(
+        request.user, organization_id, stage_id, request.payload
+    )
+    return JsonResponse({**stage_data(stage), "moved_leads": moved})
+
+
+@endpoint(["POST"], authenticated=True)
+def restore_stage(request, organization_id, stage_id):
+    return JsonResponse(
+        stage_data(pipeline.restore_stage(request.user, organization_id, stage_id))
+    )

@@ -176,7 +176,7 @@ class DeliveryTests(DeliveryFixtures):
         self.assertEqual(job.status, "delivered")
         self.assertEqual(job.attempts.count(), 2)
         self.lead_record.refresh_from_db()
-        self.assertEqual(self.lead_record.stage, "new")
+        self.assertEqual(self.lead_record.stage.name, "Новое")
 
     def test_error_classification_and_manual_retry(self):
         self.assertEqual(delivery.classify(Reply(409, {}), uuid.uuid4())[0], "conflict")

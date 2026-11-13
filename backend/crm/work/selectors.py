@@ -4,7 +4,7 @@ from django.db.models import Count, Q
 from django.utils import timezone
 
 from crm.core.errors import ApiError
-from crm.sales.models import Lead
+from crm.sales.models import PipelineStage
 from crm.sales.selectors import clients_for, leads_for
 
 from .models import FollowUpTask
@@ -42,33 +42,32 @@ def filtered_tasks(member, status):
     return queryset.filter(filters[status]).order_by("due_at", "id")
 
 
+def open_leads(leads):
+    return leads.filter(stage__kind=PipelineStage.Kind.OPEN)
+
+
 def sales_summary(member):
     leads = leads_for(member)
     tasks = tasks_for(member)
-    counts = {
-        row["stage"]: row["count"]
+    by_stage = {
+        str(row["stage"]): row["count"]
         for row in leads.values("stage").annotate(count=Count("id"))
     }
-    overdue = tasks.filter(
-        completed_at__isnull=True, due_at__lte=timezone.now()
-    ).count()
-    contacts_due = (
-        leads.filter(next_contact_at__lte=timezone.now())
-        .exclude(stage__in=[Lead.Stage.ADMITTED, Lead.Stage.REFUSED])
-        .count()
-    )
+    by_kind = {
+        row["stage__kind"]: row["count"]
+        for row in leads.values("stage__kind").annotate(count=Count("id"))
+    }
+    now = timezone.now()
     return {
         "clients": clients_for(member).count(),
-        "leads": sum(counts.values()),
-        "stages": counts,
-        "active_leads": sum(
-            value
-            for stage, value in counts.items()
-            if stage not in (Lead.Stage.ADMITTED, Lead.Stage.REFUSED)
-        ),
-        "admitted": counts.get(Lead.Stage.ADMITTED, 0),
-        "refused": counts.get(Lead.Stage.REFUSED, 0),
+        "leads": sum(by_stage.values()),
+        "stages": by_stage,
+        "active_leads": by_kind.get(PipelineStage.Kind.OPEN, 0),
+        "admitted": by_kind.get(PipelineStage.Kind.ADMITTED, 0),
+        "refused": by_kind.get(PipelineStage.Kind.REFUSED, 0),
         "open_tasks": tasks.filter(completed_at__isnull=True).count(),
-        "overdue_tasks": overdue,
-        "contacts_due": contacts_due,
+        "overdue_tasks": tasks.filter(
+            completed_at__isnull=True, due_at__lte=now
+        ).count(),
+        "contacts_due": open_leads(leads).filter(next_contact_at__lte=now).count(),
     }

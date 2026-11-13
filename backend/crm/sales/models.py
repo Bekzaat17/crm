@@ -30,15 +30,50 @@ class RelatedContact(models.Model):
     phone = models.CharField(max_length=40, blank=True)
 
 
-class Lead(models.Model):
-    class Stage(models.TextChoices):
-        NEW = "new", "Новое"
-        WORK = "work", "В работе"
-        CONSULTATION = "consultation", "Консультация"
-        EXPECTED = "expected", "Ожидаем поступление"
+class PipelineStage(models.Model):
+    """Настраиваемый этап воронки компании.
+
+    Название и порядок задаёт компания; бизнес-правила опираются только на тип:
+    открытый этап, поступление или отказ.
+    """
+
+    class Kind(models.TextChoices):
+        OPEN = "open", "В работе"
         ADMITTED = "admitted", "Поступил"
         REFUSED = "refused", "Отказ"
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    organization = models.ForeignKey(
+        Organization, on_delete=models.CASCADE, related_name="pipeline_stages"
+    )
+    name = models.CharField("Название этапа", max_length=80)
+    kind = models.CharField(max_length=20, choices=Kind.choices, default=Kind.OPEN)
+    color = models.CharField(max_length=7, blank=True)
+    position = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    version = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(kind__in=["open", "admitted", "refused"]),
+                name="crm_valid_stage_kind",
+            ),
+            models.UniqueConstraint(
+                fields=["organization", "name"],
+                condition=models.Q(is_active=True),
+                name="crm_unique_active_stage_name",
+            ),
+        ]
+        indexes = [models.Index(fields=["organization", "is_active", "position"])]
+
+    @property
+    def is_closed(self):
+        return self.kind != self.Kind.OPEN
+
+
+class Lead(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
     client = models.ForeignKey(Client, on_delete=models.PROTECT, related_name="leads")
@@ -46,9 +81,11 @@ class Lead(models.Model):
         Membership, on_delete=models.PROTECT, related_name="leads"
     )
     branch = models.ForeignKey(Branch, on_delete=models.PROTECT)
+    stage = models.ForeignKey(
+        PipelineStage, on_delete=models.PROTECT, related_name="leads"
+    )
     title = models.CharField(max_length=240)
     source = models.CharField(max_length=120, blank=True)
-    stage = models.CharField(max_length=20, choices=Stage.choices, default=Stage.NEW)
     refusal_reason = models.CharField(max_length=500, blank=True)
     next_contact_at = models.DateTimeField(null=True, blank=True)
     version = models.PositiveIntegerField(default=1)
@@ -56,25 +93,6 @@ class Lead(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        constraints = [
-            models.CheckConstraint(
-                condition=models.Q(
-                    stage__in=[
-                        "new",
-                        "work",
-                        "consultation",
-                        "expected",
-                        "admitted",
-                        "refused",
-                    ]
-                ),
-                name="crm_valid_lead_stage",
-            ),
-            models.CheckConstraint(
-                condition=~models.Q(stage="refused") | ~models.Q(refusal_reason=""),
-                name="crm_refusal_requires_reason",
-            ),
-        ]
         indexes = [models.Index(fields=["organization", "stage", "-updated_at"])]
 
 

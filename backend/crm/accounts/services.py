@@ -14,6 +14,7 @@ from crm.core.throttle import throttle
 from crm.core.tokens import digest, new_token
 from crm.core.validation import clean_email, clean_text
 from crm.organizations.services import create_organization
+from crm.sales.pipeline import create_default_stages
 
 from .emails import password_reset_email, registration_email
 from .models import Registration, User
@@ -61,7 +62,8 @@ def confirm_registration(token):
         name=registration.name,
         password=registration.password_hash,
     )
-    create_organization(user, registration.company_name)
+    organization = create_organization(user, registration.company_name)
+    create_default_stages(organization)
     registration.delete()
     return user
 

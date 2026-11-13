@@ -10,7 +10,13 @@ from crm.organizations.models import (
     Membership,
     Organization,
 )
-from crm.sales.models import Client, Lead, LeadActivity, RelatedContact
+from crm.sales.models import (
+    Client,
+    Lead,
+    LeadActivity,
+    PipelineStage,
+    RelatedContact,
+)
 from crm.work.models import FollowUpTask
 
 __all__ = [
@@ -25,6 +31,7 @@ __all__ = [
     "LeadActivity",
     "Membership",
     "Organization",
+    "PipelineStage",
     "RateLimitBucket",
     "RehubCenter",
     "Registration",

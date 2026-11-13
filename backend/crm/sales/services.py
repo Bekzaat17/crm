@@ -10,6 +10,7 @@ from crm.organizations.permissions import Perm, can
 
 from .lead_changes import ChangeContext, apply_changes
 from .models import Client, Lead, LeadActivity, RelatedContact
+from .pipeline import initial_stage
 from .selectors import find_client, find_lead
 from .validation import client_fields
 
@@ -84,6 +85,7 @@ def create_lead(actor, company_id, data):
         client=client,
         assignee=company_assignee(company_id, assignee_id),
         branch=company_branch(company_id, data.get("branch_id")),
+        stage=initial_stage(company_id),
         title=clean_text(data.get("title"), "Название обращения", 240),
         source=optional(data, "source", 120),
     )

@@ -13,6 +13,7 @@ from crm.models import (
     User,
 )
 from crm.sales import services
+from crm.sales.pipeline import create_default_stages
 
 
 class SalesFixtures(TestCase):
@@ -25,6 +26,7 @@ class SalesFixtures(TestCase):
             user=self.owner, organization=self.org, role="owner"
         )
         self.branch = Branch.objects.create(organization=self.org, name="Основной")
+        create_default_stages(self.org)
         self.manager = User.objects.create_user(
             email="manager@sales.test", name="Менеджер", password="Sales-River-5748!"
         )
@@ -35,6 +37,7 @@ class SalesFixtures(TestCase):
         self.foreign_branch = Branch.objects.create(
             organization=self.foreign, name="Другой"
         )
+        create_default_stages(self.foreign)
         self.foreign_member = Membership.objects.create(
             user=self.owner, organization=self.foreign, role="owner"
         )
@@ -52,6 +55,9 @@ class SalesFixtures(TestCase):
         return self.client.post(
             "/api/" + path + "/", data=json.dumps(data), content_type="application/json"
         )
+
+    def stage(self, name, org=None):
+        return str((org or self.org).pipeline_stages.get(name=name).id)
 
     def url(self, tail):
         return f"organizations/{self.org.id}/{tail}"
@@ -202,20 +208,30 @@ class SalesTests(SalesFixtures):
         lead = self.lead()
         path = self.url(f"leads/{lead.id}")
         self.assertEqual(
-            self.post(path, {"stage": "refused", "version": 1}).status_code, 400
+            self.post(path, {"stage": self.stage("Отказ"), "version": 1}).status_code,
+            400,
         )
         response = self.post(
             path,
-            {"stage": "refused", "refusal_reason": "Отложил решение", "version": 1},
+            {
+                "stage": self.stage("Отказ"),
+                "refusal_reason": "Отложил решение",
+                "version": 1,
+            },
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["refusal_reason"], "Отложил решение")
         self.assertIn("Отказ", response.json()["activities"][0]["text"])
         self.assertEqual(
-            self.post(path, {"stage": "work", "version": 1}).status_code, 409
+            self.post(
+                path, {"stage": self.stage("В работе"), "version": 1}
+            ).status_code,
+            409,
         )
         self.assertEqual(
-            self.post(path, {"stage": "work", "version": 2}).json()["refusal_reason"],
+            self.post(path, {"stage": self.stage("В работе"), "version": 2}).json()[
+                "refusal_reason"
+            ],
             "",
         )
 
@@ -277,6 +293,7 @@ class SalesTests(SalesFixtures):
                 assignee=self.member,
                 branch=self.branch,
                 title=f"Звонок {i}",
+                stage_id=self.stage("Новое"),
             )
             for i in range(52)
         ]
@@ -284,7 +301,7 @@ class SalesTests(SalesFixtures):
         first = self.client.get("/api/" + self.url("leads") + "/").json()
         second = self.client.get("/api/" + self.url("leads") + "/?page=2").json()
         self.assertEqual(first["total"], 52)
-        self.assertEqual(first["counts"]["new"], 52)
+        self.assertEqual(first["counts"][self.stage("Новое")], 52)
         self.assertEqual(len(first["items"]), 50)
         self.assertEqual(len(second["items"]), 2)
         self.assertFalse(second["has_more"])

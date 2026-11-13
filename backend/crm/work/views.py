@@ -3,11 +3,10 @@ from django.utils import timezone
 
 from crm.core.http import endpoint
 from crm.organizations.context import get_membership
-from crm.sales.models import Lead
 from crm.sales.selectors import leads_for, page
 from crm.sales.serializers import lead_data
 
-from .selectors import filtered_tasks, sales_summary
+from .selectors import filtered_tasks, open_leads, sales_summary
 from .serializers import task_data
 from .services import create_task, update_task
 
@@ -46,10 +45,9 @@ def edit_task(request, organization_id, task_id):
 def contacts_due(request, organization_id):
     member = get_membership(request.user, organization_id)
     queryset = (
-        leads_for(member)
+        open_leads(leads_for(member))
         .filter(next_contact_at__lte=timezone.now())
-        .exclude(stage__in=[Lead.Stage.ADMITTED, Lead.Stage.REFUSED])
-        .select_related("client", "assignee__user")
+        .select_related("client", "assignee__user", "stage")
         .order_by("next_contact_at", "id")
     )
     rows, total, more = page(queryset, request.GET.get("page", "1"))

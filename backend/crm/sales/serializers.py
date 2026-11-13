@@ -27,8 +27,9 @@ def lead_data(lead):
         assignee_name=lead.assignee.user.name,
         branch_id=str(lead.branch_id),
         source=lead.source,
-        stage=lead.stage,
-        stage_label=lead.get_stage_display(),
+        stage=str(lead.stage_id),
+        stage_label=lead.stage.name,
+        stage_kind=lead.stage.kind,
         refusal_reason=lead.refusal_reason,
         next_contact_at=lead.next_contact_at.isoformat()
         if lead.next_contact_at
@@ -36,3 +37,19 @@ def lead_data(lead):
         version=lead.version,
         updated_at=lead.updated_at.isoformat(),
     )
+
+
+def stage_data(stage):
+    data = dict(
+        id=str(stage.id),
+        name=stage.name,
+        kind=stage.kind,
+        kind_label=stage.get_kind_display(),
+        color=stage.color,
+        position=stage.position,
+        is_active=stage.is_active,
+        version=stage.version,
+    )
+    if hasattr(stage, "lead_count"):
+        data["lead_count"] = stage.lead_count
+    return data

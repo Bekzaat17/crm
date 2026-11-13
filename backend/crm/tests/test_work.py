@@ -155,7 +155,7 @@ class WorkTests(SalesFixtures):
             {
                 "version": 1,
                 "next_contact_at": (timezone.now() - timedelta(hours=1)).isoformat(),
-                "stage": "admitted",
+                "stage": self.stage("Поступил"),
             },
         )
         self.assertEqual(

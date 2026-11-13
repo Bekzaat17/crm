@@ -19,6 +19,7 @@ from crm.models import (
     User,
 )
 from crm.organizations.services import accept_invitation
+from crm.sales.pipeline import create_default_stages
 
 
 @skipUnless(
@@ -91,6 +92,7 @@ class ConcurrencyTests(TransactionTestCase):
             password="Forest-River-2748!",
         )
         org = Organization.objects.create(name="Центр")
+        create_default_stages(org)
         membership = Membership.objects.create(
             user=actor, organization=org, role="owner"
         )
@@ -125,8 +127,12 @@ class ConcurrencyTests(TransactionTestCase):
             finally:
                 connections.close_all()
 
+        stages = [
+            str(org.pipeline_stages.get(name=name).id)
+            for name in ("В работе", "Консультация")
+        ]
         with ThreadPoolExecutor(max_workers=2) as pool:
-            results = list(pool.map(update, ["work", "consultation"]))
+            results = list(pool.map(update, stages))
         self.assertCountEqual(results, ["updated", 409])
         lead.refresh_from_db()
         self.assertEqual(lead.version, 2)
@@ -140,6 +146,7 @@ class ConcurrencyTests(TransactionTestCase):
         org = Organization.objects.create(name="Центр")
         member = Membership.objects.create(user=owner, organization=org, role="owner")
         branch = Branch.objects.create(organization=org, name="Основной")
+        create_default_stages(org)
         client = Client.objects.create(
             organization=org, created_by=owner, name="Тестовый клиент"
         )
@@ -149,6 +156,7 @@ class ConcurrencyTests(TransactionTestCase):
             assignee=member,
             branch=branch,
             title="Поступление",
+            stage=org.pipeline_stages.get(name="Новое"),
         )
         center = RehubCenter.objects.create(
             organization=org,

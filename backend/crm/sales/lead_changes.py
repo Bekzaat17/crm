@@ -13,7 +13,8 @@ from crm.core.validation import clean_text, optional, optional_aware_datetime
 from crm.organizations.models import Membership
 from crm.organizations.permissions import Perm, require
 
-from .models import Lead
+from .models import Lead, PipelineStage
+from .pipeline import find_stage
 
 
 @dataclass(frozen=True)
@@ -28,26 +29,27 @@ class LeadFieldRule(Protocol):
 
 
 class StageRule:
+    """Переход в активный этап воронки компании; отказ требует причины."""
+
     def apply(self, lead, data, ctx):
-        stage = data.get("stage", lead.stage)
-        if stage not in Lead.Stage.values:
-            raise ApiError("Неизвестный этап.")
+        stage = lead.stage
+        if "stage" in data and str(data["stage"]) != str(lead.stage_id):
+            stage = find_stage(ctx.company_id, data["stage"])
         reason = (
             optional(data, "refusal_reason", 500)
             if "refusal_reason" in data
             else lead.refusal_reason
         )
-        if stage == Lead.Stage.REFUSED and not reason:
+        refused = stage.kind == PipelineStage.Kind.REFUSED
+        if refused and not reason:
             raise ApiError("Укажите причину отказа.")
         changes = []
-        if stage != lead.stage:
-            changes.append(
-                f"Этап: {lead.get_stage_display()} → {Lead.Stage(stage).label}"
-            )
-        if stage == Lead.Stage.REFUSED and reason != lead.refusal_reason:
+        if stage.pk != lead.stage_id:
+            changes.append(f"Этап: {lead.stage.name} → {stage.name}")
+        if refused and reason != lead.refusal_reason:
             changes.append(f"Причина отказа: {reason}")
         lead.stage = stage
-        lead.refusal_reason = reason if stage == Lead.Stage.REFUSED else ""
+        lead.refusal_reason = reason if refused else ""
         return changes
 
 

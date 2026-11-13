@@ -12,7 +12,6 @@ from crm.organizations.permissions import (
     require,
 )
 from crm.sales.lead_changes import ChangeContext, apply_changes
-from crm.sales.models import Lead
 from crm.tests.test_sales import SalesFixtures
 
 
@@ -65,12 +64,12 @@ class LeadChangeRulesTests(SalesFixtures):
 
     def test_refusal_requires_reason(self):
         with self.assertRaises(ApiError):
-            self.apply(self.lead(), {"stage": Lead.Stage.REFUSED})
+            self.apply(self.lead(), {"stage": self.stage("Отказ")})
 
     def test_leaving_refused_stage_clears_reason(self):
         lead = self.lead()
-        self.apply(lead, {"stage": "refused", "refusal_reason": "Причина"})
-        changes = self.apply(lead, {"stage": "work"})
+        self.apply(lead, {"stage": self.stage("Отказ"), "refusal_reason": "Причина"})
+        changes = self.apply(lead, {"stage": self.stage("В работе")})
         self.assertEqual(lead.refusal_reason, "")
         self.assertIn("Этап: Отказ → В работе", changes)
 
