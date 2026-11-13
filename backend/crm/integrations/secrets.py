@@ -1,7 +1,7 @@
 from cryptography.fernet import Fernet, InvalidToken
 from django.conf import settings
 
-from crm.services import ApiError
+from crm.core.errors import ApiError
 
 
 def cipher():

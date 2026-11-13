@@ -4,60 +4,39 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
-from crm.models import AdmissionTransfer, AuditEvent, LeadActivity, RehubCenter
+from crm.core.errors import ApiError
+from crm.core.validation import clean_text, identifier
+from crm.organizations import audit
+from crm.organizations.context import get_membership
+from crm.organizations.permissions import Perm
+from crm.sales.models import LeadActivity
 from crm.sales.selectors import find_lead
-from crm.sales.validation import identifier
-from crm.services import ApiError, clean_text, get_membership
+from crm.sales.services import require_version
 
 from .address import normalize_domain
+from .models import AdmissionTransfer, RehubCenter
 from .secrets import decrypt, encrypt
-from .selectors import admin_membership, find_center, require_sender
+from .selectors import find_center
 from .transport import HTTPSClient, Transport
-
-
-def center_data(center, admin=False):
-    result = {
-        "id": str(center.id),
-        "name": center.name,
-        "domain": center.domain,
-        "endpoint": f"https://{center.domain}/crm/create",
-        "verified": bool(center.verified_at),
-        "is_active": center.is_active,
-        "version": center.version,
-    }
-    if admin:
-        result.update(
-            {
-                "company_id": str(center.organization_id),
-                "has_key": bool(center.encrypted_key),
-            }
-        )
-    return result
 
 
 @transaction.atomic
 def create_center(actor, company_id, data):
-    admin_membership(actor, company_id)
+    get_membership(actor, company_id, Perm.MANAGE_CENTERS)
     center = RehubCenter.objects.create(
         organization_id=company_id,
         name=clean_text(data.get("name"), "Название центра", 160),
         domain=normalize_domain(data.get("address")),
     )
-    AuditEvent.objects.create(
-        organization_id=company_id,
-        actor=actor,
-        action="center.created",
-        target_id=str(center.id),
-    )
+    audit.record(company_id, actor, "center.created", center.id)
     return center
 
 
 @transaction.atomic
 def update_center(actor, company_id, center_id, data):
-    admin_membership(actor, company_id)
+    get_membership(actor, company_id, Perm.MANAGE_CENTERS)
     center = find_center(company_id, center_id, lock=True)
-    if data.get("version") != center.version:
-        raise ApiError("Центр изменился. Обновите список.", 409)
+    require_version(center, data, "Центр изменился. Обновите список.")
     if "address" in data and normalize_domain(data["address"]) != center.domain:
         if center.admissiontransfer_set.exists():
             raise ApiError(
@@ -81,17 +60,12 @@ def update_center(actor, company_id, center_id, data):
         center.is_active = data["is_active"]
     center.version += 1
     center.save()
-    AuditEvent.objects.create(
-        organization_id=company_id,
-        actor=actor,
-        action="center.updated",
-        target_id=str(center.id),
-    )
+    audit.record(company_id, actor, "center.updated", center.id)
     return center
 
 
 def verify_center(actor, company_id, center_id, transport: Transport | None = None):
-    admin_membership(actor, company_id)
+    get_membership(actor, company_id, Perm.MANAGE_CENTERS)
     center = find_center(company_id, center_id)
     if not center.is_active or not center.encrypted_key:
         raise ApiError("Сначала сохраните ключ активного центра.")
@@ -163,8 +137,7 @@ def admission_payload(lead, operation_id, data):
 
 @transaction.atomic
 def queue_admission(actor, company_id, lead_id, data):
-    member = get_membership(actor, company_id)
-    require_sender(member)
+    member = get_membership(actor, company_id, Perm.SEND_ADMISSIONS)
     lead = find_lead(member, lead_id, lock=True)
     center = find_center(company_id, identifier(data.get("center_id")), lock=True)
     if not center.is_active or not center.verified_at:
@@ -201,8 +174,7 @@ def queue_admission(actor, company_id, lead_id, data):
 
 @transaction.atomic
 def retry_admission(actor, company_id, transfer_id):
-    member = get_membership(actor, company_id)
-    require_sender(member)
+    get_membership(actor, company_id, Perm.SEND_ADMISSIONS)
     transfer = (
         AdmissionTransfer.objects.select_for_update()
         .filter(pk=transfer_id, lead__organization_id=company_id)
@@ -220,10 +192,5 @@ def retry_admission(actor, company_id, transfer_id):
     transfer.lease_until = None
     transfer.lease_id = None
     transfer.save()
-    AuditEvent.objects.create(
-        organization_id=company_id,
-        actor=actor,
-        action="transfer.retried",
-        target_id=str(transfer.id),
-    )
+    audit.record(company_id, actor, "transfer.retried", transfer.id)
     return transfer

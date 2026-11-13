@@ -9,7 +9,8 @@ from django.db import IntegrityError, transaction
 from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
-from crm import services
+from crm.accounts import services as accounts
+from crm.core.tokens import digest
 from crm.models import (
     AuditEvent,
     Invitation,
@@ -93,10 +94,11 @@ class AccountTests(AccountHelpers):
     def test_registration_rolls_back_all_objects(self):
         token = self.registration()
         with patch(
-            "crm.services.Branch.objects.create", side_effect=RuntimeError("test")
+            "crm.organizations.services.Branch.objects.create",
+            side_effect=RuntimeError("test"),
         ):
             with self.assertRaises(RuntimeError):
-                services.confirm_registration(token)
+                accounts.confirm_registration(token)
         self.assertFalse(User.objects.exists())
         self.assertFalse(Organization.objects.exists())
         self.assertTrue(Registration.objects.exists())
@@ -280,7 +282,7 @@ class AccountTests(AccountHelpers):
 
     def test_mail_failure_rolls_back_invitation(self):
         _, org = self.owner()
-        with patch("crm.services.send_mail", side_effect=OSError("mail unavailable")):
+        with patch("crm.core.mail.send_mail", side_effect=OSError("mail unavailable")):
             response = self.post(
                 f"organizations/{org.id}/invitations",
                 {"email": "manager@example.test", "role": "manager"},
@@ -479,4 +481,4 @@ class IsolationTests(AccountHelpers):
         for suffix in ("team", "audit"):
             response = self.client.get(f"/api/organizations/{self.org_a.id}/{suffix}/")
             self.assertNotIn(token, response.content.decode())
-            self.assertNotIn(services.digest(token), response.content.decode())
+            self.assertNotIn(digest(token), response.content.decode())

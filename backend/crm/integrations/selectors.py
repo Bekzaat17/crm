@@ -1,12 +1,7 @@
-from crm.models import AdmissionTransfer, RehubCenter
+from crm.core.errors import ApiError
 from crm.sales.selectors import leads_for
-from crm.services import ApiError, get_membership, require_team_admin
 
-
-def admin_membership(actor, company_id):
-    member = get_membership(actor, company_id)
-    require_team_admin(member)
-    return member
+from .models import AdmissionTransfer, RehubCenter
 
 
 def find_center(company_id, center_id, lock=False):
@@ -19,6 +14,14 @@ def find_center(company_id, center_id, lock=False):
     return center
 
 
+def company_centers(company_id):
+    return RehubCenter.objects.filter(organization_id=company_id).order_by("name")
+
+
+def destinations(company_id):
+    return company_centers(company_id).filter(is_active=True, verified_at__isnull=False)
+
+
 def transfers_for(member, lead_id):
     if not leads_for(member).filter(pk=lead_id).exists():
         raise ApiError("Обращение не найдено.", 404)
@@ -27,10 +30,3 @@ def transfers_for(member, lead_id):
         .select_related("center")
         .order_by("-created_at")
     )
-
-
-def require_sender(member):
-    if member.role not in ("owner", "admin", "lead"):
-        raise ApiError(
-            "Подтвердить передачу может владелец, администратор или руководитель.", 403
-        )

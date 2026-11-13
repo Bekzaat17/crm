@@ -1,0 +1,44 @@
+import uuid
+
+from django.contrib.auth.models import AbstractUser, BaseUserManager
+from django.db import models
+from django.db.models.functions import Lower
+
+
+class UserManager(BaseUserManager):
+    use_in_migrations = True
+
+    def create_user(self, email, password=None, **extra_fields):
+        user = self.model(email=email.strip().lower(), **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, password=None, **extra_fields):
+        extra_fields.update(is_staff=True, is_superuser=True)
+        return self.create_user(email, password, **extra_fields)
+
+
+class User(AbstractUser):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    username = None
+    email = models.EmailField(unique=True)
+    name = models.CharField("Имя", max_length=120)
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = ["name"]
+    objects = UserManager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(Lower("email"), name="crm_unique_email_ci")
+        ]
+
+
+class Registration(models.Model):
+    email = models.EmailField(unique=True)
+    name = models.CharField(max_length=120)
+    company_name = models.CharField(max_length=160)
+    password_hash = models.CharField(max_length=128)
+    token_hash = models.CharField(max_length=64, unique=True)
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)

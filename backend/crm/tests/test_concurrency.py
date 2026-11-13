@@ -7,7 +7,9 @@ from django.db import close_old_connections, connection, connections
 from django.test import TransactionTestCase
 from django.utils import timezone
 
-from crm import services
+from crm.core.errors import ApiError
+from crm.core.throttle import throttle
+from crm.core.tokens import digest
 from crm.models import (
     AuditEvent,
     Invitation,
@@ -16,6 +18,7 @@ from crm.models import (
     RateLimitBucket,
     User,
 )
+from crm.organizations.services import accept_invitation
 
 
 @skipUnless(
@@ -37,7 +40,7 @@ class ConcurrencyTests(TransactionTestCase):
             email=user.email,
             role="manager",
             invited_by=owner,
-            token_hash=services.digest(token),
+            token_hash=digest(token),
             expires_at=timezone.now() + timedelta(days=1),
         )
         barrier = Barrier(2)
@@ -48,9 +51,9 @@ class ConcurrencyTests(TransactionTestCase):
                 actor = User.objects.get(pk=user.pk)
                 barrier.wait(timeout=10)
                 try:
-                    services.accept_invitation(token, actor, {})
+                    accept_invitation(token, actor, {})
                     return "accepted"
-                except services.ApiError:
+                except ApiError:
                     return "closed"
             finally:
                 connections.close_all()
@@ -70,7 +73,7 @@ class ConcurrencyTests(TransactionTestCase):
             close_old_connections()
             try:
                 barrier.wait(timeout=10)
-                services.throttle("concurrent-test", "synthetic", 10)
+                throttle("concurrent-test", "synthetic", 10)
             finally:
                 connections.close_all()
 
@@ -117,7 +120,7 @@ class ConcurrencyTests(TransactionTestCase):
                         user, org.id, lead.id, {"version": 1, "stage": stage}
                     )
                     return "updated"
-                except services.ApiError as error:
+                except ApiError as error:
                     return error.status
             finally:
                 connections.close_all()

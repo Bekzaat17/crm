@@ -2,6 +2,7 @@ import json
 
 from django.test import TestCase
 
+from crm.core.errors import ApiError
 from crm.models import (
     Branch,
     Client,
@@ -12,7 +13,6 @@ from crm.models import (
     User,
 )
 from crm.sales import services
-from crm.services import ApiError
 
 
 class SalesFixtures(TestCase):

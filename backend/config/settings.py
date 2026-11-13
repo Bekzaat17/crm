@@ -84,7 +84,7 @@ CSRF_COOKIE_SECURE = not DEBUG
 CSRF_TRUSTED_ORIGINS = os.getenv(
     "CRM_TRUSTED_ORIGINS", "http://127.0.0.1:3100,http://localhost:3100"
 ).split(",")
-CSRF_FAILURE_VIEW = "crm.views.csrf_failure"
+CSRF_FAILURE_VIEW = "crm.accounts.views.csrf_failure"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 SECURE_SSL_REDIRECT = not DEBUG

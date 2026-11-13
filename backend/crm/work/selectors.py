@@ -3,9 +3,11 @@ from datetime import datetime, time, timedelta
 from django.db.models import Count, Q
 from django.utils import timezone
 
-from crm.models import FollowUpTask, Lead
+from crm.core.errors import ApiError
+from crm.sales.models import Lead
 from crm.sales.selectors import clients_for, leads_for
-from crm.services import ApiError
+
+from .models import FollowUpTask
 
 
 def tasks_for(member):

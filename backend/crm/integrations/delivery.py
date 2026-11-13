@@ -9,9 +9,10 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from crm.models import AdmissionTransfer, DeliveryAttempt, LeadActivity
-from crm.services import ApiError
+from crm.core.errors import ApiError
+from crm.sales.models import LeadActivity
 
+from .models import AdmissionTransfer, DeliveryAttempt
 from .secrets import decrypt
 from .transport import HTTPSClient, Transport
 

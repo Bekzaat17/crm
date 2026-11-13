@@ -1,11 +1,14 @@
 from django.db.models import Count, Q
 from django.http import JsonResponse
 
-from crm.http import endpoint
-from crm.models import Branch, Lead, Membership
-from crm.services import ApiError, get_membership
+from crm.core.errors import ApiError
+from crm.core.http import endpoint
+from crm.organizations.context import get_membership
+from crm.organizations.models import Branch, Membership
+from crm.organizations.permissions import Perm, can
 
 from . import services
+from .models import Lead
 from .selectors import clients_for, find_client, find_lead, leads_for, page
 from .serializers import client_data, lead_data
 
@@ -16,7 +19,7 @@ def metadata(request, organization_id):
     staff = Membership.objects.filter(
         organization_id=organization_id, is_active=True
     ).select_related("user")
-    if m.role == "manager":
+    if not can(m, Perm.ASSIGN_LEADS):
         staff = staff.filter(pk=m.pk)
     return JsonResponse(
         {
@@ -31,8 +34,8 @@ def metadata(request, organization_id):
                     organization_id=organization_id
                 ).order_by("name")
             ],
-            "can_assign": m.role != "manager",
-            "can_send": m.role in ("owner", "admin", "lead"),
+            "can_assign": can(m, Perm.ASSIGN_LEADS),
+            "can_send": can(m, Perm.SEND_ADMISSIONS),
         }
     )
 

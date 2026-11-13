@@ -1,47 +1,49 @@
-from django.db.models import Q
+"""Правила видимости обращений и карточек. Область задаёт политика роли."""
 
-from crm.models import Client, Lead
-from crm.services import ApiError
+from crm.core.errors import ApiError
+from crm.organizations.permissions import policy_for
+
+from .models import Client, Lead
+
+PAGE_SIZE = 50
 
 
 def leads_for(member):
-    qs = Lead.objects.filter(organization_id=member.organization_id)
-    return qs.filter(assignee=member) if member.role == "manager" else qs
+    queryset = Lead.objects.filter(organization_id=member.organization_id)
+    return policy_for(member).scope.leads(member, queryset)
 
 
 def clients_for(member):
-    qs = Client.objects.filter(organization_id=member.organization_id)
-    if member.role == "manager":
-        qs = qs.filter(
-            Q(leads__assignee=member) | Q(created_by=member.user, leads__isnull=True)
-        ).distinct()
-    return qs
+    queryset = Client.objects.filter(organization_id=member.organization_id)
+    return policy_for(member).scope.clients(member, queryset)
 
 
 def find_client(member, pk, lock=False):
     # distinct + FOR UPDATE не поддерживается PostgreSQL: сначала проверяем область доступа.
     if not clients_for(member).filter(pk=pk).exists():
         raise ApiError("Клиент не найден.", 404)
-    qs = Client.objects.filter(pk=pk, organization_id=member.organization_id)
-    return qs.select_for_update().get() if lock else qs.get()
+    queryset = Client.objects.filter(pk=pk, organization_id=member.organization_id)
+    return queryset.select_for_update().get() if lock else queryset.get()
 
 
 def find_lead(member, pk, lock=False):
-    qs = leads_for(member)
+    queryset = leads_for(member)
     if lock:
-        qs = qs.select_for_update()
-    obj = qs.filter(pk=pk).first()
-    if not obj:
+        queryset = queryset.select_for_update()
+    lead = queryset.filter(pk=pk).first()
+    if not lead:
         raise ApiError("Обращение не найдено.", 404)
-    return obj
+    return lead
 
 
-def page(qs, value):
+def page(queryset, value):
     try:
         number = int(value)
         if number < 1 or number > 100000:
             raise ValueError
     except ValueError:
         raise ApiError("Некорректный номер страницы.")
-    total = qs.count()
-    return list(qs[(number - 1) * 50 : number * 50]), total, number * 50 < total
+    total = queryset.count()
+    start = (number - 1) * PAGE_SIZE
+    rows = list(queryset[start : start + PAGE_SIZE])
+    return rows, total, number * PAGE_SIZE < total

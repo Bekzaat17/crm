@@ -4,7 +4,7 @@ from urllib.parse import urlsplit
 
 from django.conf import settings
 
-from crm.services import ApiError
+from crm.core.errors import ApiError
 
 
 def normalize_domain(value):

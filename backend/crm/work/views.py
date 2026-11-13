@@ -1,11 +1,11 @@
 from django.http import JsonResponse
 from django.utils import timezone
 
-from crm.http import endpoint
-from crm.models import Lead
+from crm.core.http import endpoint
+from crm.organizations.context import get_membership
+from crm.sales.models import Lead
 from crm.sales.selectors import leads_for, page
 from crm.sales.serializers import lead_data
-from crm.services import get_membership
 
 from .selectors import filtered_tasks, sales_summary
 from .serializers import task_data
