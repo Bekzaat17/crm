@@ -19,16 +19,18 @@ const KINDS: { value: StageKind; label: string; hint: string }[] = [
 function KindSelect({
   value,
   disabled,
+  label = "Тип этапа",
 }: {
   value: StageKind;
   disabled?: boolean;
+  label?: string;
 }) {
   return (
     <select
       name="kind"
       defaultValue={value}
       disabled={disabled}
-      aria-label="Тип этапа"
+      aria-label={label}
     >
       {KINDS.map((k) => (
         <option key={k.value} value={k.value} title={k.hint}>
@@ -76,7 +78,12 @@ function ArchiveDialog({
           });
         }}
       >
-        {stage.lead_count ? (
+        {stage.lead_count && !targets.length ? (
+          <p className="alert error">
+            Нет другого активного этапа типа «{stage.kind_label}». Сначала
+            создайте его, чтобы перенести обращения.
+          </p>
+        ) : stage.lead_count ? (
           <label>
             Перенести обращения ({stage.lead_count}) в этап
             <select name="move_to" required>
@@ -94,7 +101,10 @@ function ArchiveDialog({
           Обращения можно перенести только в этап того же типа. Перенос
           записывается в историю каждого обращения.
         </p>
-        <button className="button danger" disabled={busy}>
+        <button
+          className="button danger"
+          disabled={busy || Boolean(stage.lead_count && !targets.length)}
+        >
           Архивировать
         </button>
       </form>
@@ -159,16 +169,20 @@ function StageRow({
           type="color"
           name="color"
           defaultValue={stage.color || "#64748b"}
-          aria-label="Цвет этапа"
+          aria-label={`Цвет этапа ${stage.name}`}
         />
         <input
           name="name"
           required
           maxLength={80}
           defaultValue={stage.name}
-          aria-label="Название этапа"
+          aria-label={`Название этапа ${stage.name}`}
         />
-        <KindSelect value={stage.kind} disabled={Boolean(stage.lead_count)} />
+        <KindSelect
+          value={stage.kind}
+          disabled={Boolean(stage.lead_count)}
+          label={`Тип этапа ${stage.name}`}
+        />
         <span className="stage-count">Обращений: {stage.lead_count || 0}</span>
         <button className="button secondary" disabled={save.busy}>
           Сохранить

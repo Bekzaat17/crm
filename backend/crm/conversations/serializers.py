@@ -25,9 +25,9 @@ def message_data(message):
 
 
 def conversation_data(conversation, limit=200):
-    # Порядок фрагментов и порядок сообщений на странице мессенджера.
-    messages = conversation.messages.order_by("batch__created_at", "position")
-    total = messages.count()
+    # Сообщения и импорты предзагружены в selectors.lead_conversations.
+    messages = list(conversation.messages.all())
+    total = len(messages)
     return {
         "id": str(conversation.id),
         "source": conversation.source,
@@ -43,8 +43,15 @@ def conversation_data(conversation, limit=200):
                 "note": b.history_note,
                 "by": b.imported_by.name,
             }
-            for b in conversation.imports.select_related("imported_by").order_by(
-                "-created_at"
-            )[:10]
+            for b in list(conversation.imports.all())[:10]
         ],
+    }
+
+
+def lead_option(lead):
+    return {
+        "id": str(lead.id),
+        "title": lead.title,
+        "client_name": lead.client.name,
+        "stage": lead.stage.name,
     }

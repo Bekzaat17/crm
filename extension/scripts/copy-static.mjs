@@ -1,4 +1,5 @@
 import { cp, readFile, writeFile } from "node:fs/promises";
+// Папку dist очищает npm run build (rm -rf) до компиляции TypeScript.
 
 const root = new URL("../", import.meta.url);
 const dist = new URL("dist/", root);

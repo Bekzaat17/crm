@@ -13,6 +13,7 @@ urlpatterns = [
     path(f"{company}/leads/<uuid:lead_id>/conversations/", views.conversations),
     path("extension/authorize/", views.authorize_extension),
     path("ext/session/", views.ext_session),
+    path("ext/session/revoke/", views.ext_revoke),
     path("ext/conversations/lookup/", views.ext_lookup),
     path("ext/conversations/track/", views.ext_track),
     path("ext/conversations/untrack/", views.ext_untrack),

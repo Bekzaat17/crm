@@ -2,11 +2,10 @@ from django.db import transaction
 from django.utils import timezone
 
 from crm.core.errors import ApiError
-from crm.core.validation import aware_datetime, clean_text
+from crm.core.validation import aware_datetime, clean_text, require_version
 from crm.organizations.context import get_membership
 from crm.sales.models import LeadActivity
 from crm.sales.selectors import find_lead
-from crm.sales.services import require_version
 
 from .models import FollowUpTask
 from .selectors import find_task

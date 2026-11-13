@@ -24,6 +24,7 @@ export function NewLeadDialog({
   const router = useRouter();
   const { busy, error, setError, run } = useMutation();
   const [search, setSearch] = useState(client?.name || "");
+  const [chosen, setChosen] = useState<Suggestion | null>(client || null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>(
     client ? [client] : [],
   );
@@ -67,10 +68,20 @@ export function NewLeadDialog({
           <select
             name="client_id"
             required
-            defaultValue={client?.id || ""}
-            key={suggestions.map((c) => c.id).join()}
+            value={chosen?.id || ""}
+            onChange={(e) =>
+              setChosen(
+                suggestions.find((c) => c.id === e.target.value) || null,
+              )
+            }
           >
             <option value="">Выберите клиента</option>
+            {/* Выбранный клиент остаётся в списке, даже если поиск его не нашёл. */}
+            {chosen && !suggestions.some((c) => c.id === chosen.id) && (
+              <option value={chosen.id}>
+                {chosen.name} {chosen.phone}
+              </option>
+            )}
             {suggestions.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name} {c.phone}
@@ -111,7 +122,7 @@ export function NewLeadDialog({
           </label>
           <label>
             Филиал
-            <select name="branch_id" required>
+            <select name="branch_id" required disabled={!meta.branches.length}>
               {meta.branches.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.name}
@@ -120,7 +131,16 @@ export function NewLeadDialog({
             </select>
           </label>
         </div>
-        <button className="button primary" disabled={busy}>
+        {!meta.branches.length && (
+          <p className="small muted">
+            Нет действующих филиалов. Владелец или администратор может
+            восстановить филиал в настройках.
+          </p>
+        )}
+        <button
+          className="button primary"
+          disabled={busy || !meta.branches.length}
+        >
           Создать обращение
         </button>
       </form>

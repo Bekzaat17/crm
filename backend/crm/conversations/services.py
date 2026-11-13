@@ -19,6 +19,7 @@ from crm.sales.models import LeadActivity
 from crm.sales.selectors import find_lead
 
 from .models import Conversation, ImportBatch, Message, Source
+from .validation import clean_external_id, clean_source
 
 MAX_MESSAGES = 500
 MAX_TEXT = 10000
@@ -103,18 +104,14 @@ def import_fragment(context, data):
         .first()
     )
     conversation_data = data.get("conversation") or {}
-    external_id = clean_text(
-        conversation_data.get("external_id"), "Идентификатор диалога", 200
-    )
+    external_id = clean_external_id(conversation_data.get("external_id"))
     if existing:
         if existing.conversation.external_id != external_id:
             raise ApiError(
                 "Этот ключ повтора уже использован для другого диалога.", 409
             )
         return batch_result(existing), False
-    source = data.get("source")
-    if source not in Source.values:
-        raise ApiError("Источник должен быть WhatsApp, Telegram или Instagram.")
+    source = clean_source(data.get("source"))
     # Обращение ищется в области доступа сотрудника, которому выдан ключ.
     lead = find_lead(member, identifier(data.get("lead_id")), lock=True)
     messages = clean_messages(data.get("messages"))
@@ -157,6 +154,8 @@ def import_fragment(context, data):
     batch.created = len(fresh)
     batch.save(update_fields=["created"])
     conversation.save(update_fields=["updated_at"])
+    if not fresh:
+        return batch_result(batch), True  # без новых сообщений история не засоряется
     LeadActivity.objects.create(
         lead=lead,
         actor=member.user,

@@ -4,6 +4,8 @@ import type { SyncResponse } from "./background.js";
 
 const SYNC_DELAY = 3000;
 let lastSignature = "";
+/** После ошибки не повторяем раньше этого времени (лимит запросов CRM). */
+let pausedUntil = 0;
 let timer: number | undefined;
 
 function readCurrent(): ReadResult | null {
@@ -39,7 +41,7 @@ async function syncIfChanged() {
     read.messages.length,
     last?.external_id || last?.text,
   ].join("|");
-  if (signature === lastSignature) return;
+  if (signature === lastSignature || Date.now() < pausedUntil) return;
   lastSignature = signature;
   let result: SyncResponse;
   try {
@@ -52,11 +54,19 @@ async function syncIfChanged() {
     lastSignature = "";
     return badge("CRM: обновите страницу", true);
   }
-  if (!result?.connected || !result.tracked) return badge("");
+  if (!result?.connected)
+    return badge(
+      result?.error ? `CRM: ${result.error}` : "",
+      Boolean(result?.error),
+    );
+  if (!result.tracked) return badge("");
   if (result.error) {
-    lastSignature = ""; // повторим при следующем изменении страницы
+    // Повторим после паузы, которую назначил фоновый worker.
+    lastSignature = "";
+    pausedUntil = Date.now() + (result.retryIn || 60_000);
     return badge(`CRM: ${result.error}`, true);
   }
+  pausedUntil = 0;
   badge(
     result.created
       ? `CRM: отслеживается · новых сообщений ${result.created}`
@@ -95,7 +105,9 @@ chrome.runtime.onMessage.addListener(
     }
     if (request?.type === "rehub:resync") {
       lastSignature = "";
+      pausedUntil = 0;
       void syncIfChanged();
+      respond({ ok: true });
     }
   },
 );

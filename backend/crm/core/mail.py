@@ -1,11 +1,11 @@
-"""Письма со ссылками. Mailer — узкая зависимость, письмо — отдельный объект."""
+"""Письма со ссылками. Mailer — узкая зависимость (по умолчанию очередь
+писем, settings.CRM_MAILER), письмо — отдельный объект."""
 
 from dataclasses import dataclass, field
 from typing import Protocol
 from urllib.parse import urlencode
 
 from django.conf import settings
-from django.core.mail import send_mail
 from django.utils.module_loading import import_string
 
 
@@ -36,11 +36,6 @@ class LinkEmail:
 
 class Mailer(Protocol):
     def send(self, email: LinkEmail) -> None: ...
-
-
-class DjangoMailer:
-    def send(self, email: LinkEmail) -> None:
-        send_mail(email.subject, email.body, settings.DEFAULT_FROM_EMAIL, [email.to])
 
 
 def default_mailer() -> Mailer:

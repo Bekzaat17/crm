@@ -52,6 +52,7 @@ export function ClientDetail() {
       <div className="detail-grid">
         <article className="card">
           <h3>Данные клиента</h3>
+          <ErrorAlert message={meta.error} onRetry={meta.reload} />
           <ErrorAlert message={save.error} />
           <form
             key={record.version}

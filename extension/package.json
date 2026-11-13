@@ -1,10 +1,10 @@
 {
   "name": "rehubpro-crm-extension",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc -p . && node scripts/copy-static.mjs",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p . && node scripts/copy-static.mjs",
     "typecheck": "tsc -p . --noEmit"
   },
   "devDependencies": {

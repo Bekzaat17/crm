@@ -1,8 +1,15 @@
 /* Service worker RehubPro CRM: только уведомления, без кеширования страниц. */
-const sameOriginPath = (value) =>
-  typeof value === "string" && value.startsWith("/") && !value.startsWith("//")
-    ? value
-    : "/";
+/** Только адрес этого же сайта: «//host» и «/\\host» ведут на чужой сайт. */
+const sameOriginPath = (value) => {
+  try {
+    const url = new URL(String(value || "/"), self.location.origin);
+    return url.origin === self.location.origin
+      ? url.pathname + url.search
+      : "/";
+  } catch {
+    return "/";
+  }
+};
 
 self.addEventListener("push", (event) => {
   let data = {};

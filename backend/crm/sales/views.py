@@ -2,13 +2,21 @@ from django.db.models import Count, Q
 from django.http import JsonResponse
 
 from crm.core.http import endpoint
+from crm.core.pagination import page
+from crm.core.phones import phone_digits
 from crm.organizations.context import get_membership
 from crm.organizations.models import Branch, Membership
 from crm.organizations.permissions import Perm, can
 
 from . import pipeline, services
-from .selectors import clients_for, find_client, find_lead, leads_for, page
+from .selectors import clients_for, find_client, find_lead, leads_for
 from .serializers import client_data, lead_data, stage_data
+
+
+def digits_filter(field, query):
+    """Поиск по номеру в любом формате: «8 701…» найдёт «+7 701…»."""
+    digits = phone_digits(query)
+    return Q(**{f"{field}__contains": digits}) if len(digits) >= 4 else Q(pk=None)
 
 
 @endpoint(["GET"], authenticated=True)
@@ -57,6 +65,8 @@ def clients(request, organization_id):
             Q(name__icontains=q)
             | Q(phone__icontains=q)
             | Q(contacts__phone__icontains=q)
+            | digits_filter("phone_digits", q)
+            | digits_filter("contacts__phone_digits", q)
             | Q(contacts__name__icontains=q)
         ).distinct()
     rows, total, more = page(
@@ -113,6 +123,7 @@ def leads(request, organization_id):
             Q(title__icontains=q)
             | Q(client__name__icontains=q)
             | Q(client__phone__icontains=q)
+            | digits_filter("client__phone_digits", q)
         )
     stage = request.GET.get("stage", "")
     if stage:

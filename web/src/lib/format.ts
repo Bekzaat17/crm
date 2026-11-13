@@ -1,23 +1,21 @@
-const ZONE = "Asia/Almaty";
-
+// Время показывается в часовом поясе браузера — так же, как в полях ввода
+// datetime-local, чтобы срок в списке и в форме совпадали.
 const shortFormat = new Intl.DateTimeFormat("ru", {
   day: "numeric",
   month: "short",
   hour: "2-digit",
   minute: "2-digit",
-  timeZone: ZONE,
 });
 const fullFormat = new Intl.DateTimeFormat("ru", {
   dateStyle: "medium",
   timeStyle: "short",
-  timeZone: ZONE,
 });
 
-/** Короткая дата и время по Алматы: «13 нояб., 10:00». */
+/** Короткая дата и время: «13 нояб., 10:00». */
 export const formatShort = (value: string) =>
   shortFormat.format(new Date(value));
 
-/** Полная дата и время по Алматы. */
+/** Полная дата и время. */
 export const formatDateTime = (value: string) =>
   fullFormat.format(new Date(value));
 

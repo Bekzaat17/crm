@@ -105,13 +105,13 @@ AdmissionTransfer одновременно является бизнес-зап�
 Из `backend`:
 
 ```bash
-../.venv/bin/python manage.py deliver_admissions
+../.venv/bin/python manage.py run_worker
 ```
 
-Для одного задания:
+Один проход (передача, сообщение очереди и напоминания):
 
 ```bash
-../.venv/bin/python manage.py deliver_admissions --once
+../.venv/bin/python manage.py run_worker --once
 ```
 
 В локальном `scripts/dev.sh` исполнитель стартует вместе с API и интерфейсом. В рабочем окружении запускайте отдельным сервисом с автоматическим перезапуском. Для нескольких исполнителей нужна PostgreSQL: захват использует `SELECT FOR UPDATE SKIP LOCKED`. SQLite остаётся только удобным локальным режимом; не используйте его для нескольких исполнителей.

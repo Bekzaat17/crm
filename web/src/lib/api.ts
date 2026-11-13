@@ -1,3 +1,5 @@
+import { rememberReturnPath } from "./return-path";
+
 export type Company = {
   id: string;
   name: string;
@@ -25,6 +27,17 @@ export class ApiError extends Error {
 }
 
 let csrfToken = "";
+
+/** Запросы, для которых 401 — ожидаемый ответ, а не истёкшая сессия. */
+const PUBLIC = ["auth/", "invitations/"];
+
+/** Сессия истекла посреди работы: вернуть пользователя сюда после входа. */
+function redirectToLogin() {
+  if (typeof window === "undefined" || window.location.pathname === "/login")
+    return;
+  rememberReturnPath(window.location.pathname + window.location.search);
+  window.location.assign("/login");
+}
 
 export async function api<T>(
   path: string,
@@ -55,6 +68,8 @@ export async function api<T>(
     .json()
     .catch(() => ({ error: "Сервис временно недоступен. Попробуйте позже." }));
   if (result.csrf_token) csrfToken = result.csrf_token;
+  if (response.status === 401 && !PUBLIC.some((p) => path.startsWith(p)))
+    redirectToLogin();
   if (!response.ok)
     throw new ApiError(
       result.error || "Не удалось выполнить действие.",

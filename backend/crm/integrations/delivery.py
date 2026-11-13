@@ -21,14 +21,17 @@ LEASE_SECONDS = 120
 @transaction.atomic
 def claim_next():
     now = timezone.now()
-    job = outbox.lock_next(AdmissionTransfer.objects, now)
-    if job is None:
-        return None
-    if job.cycle_attempts >= MAX_ATTEMPTS:
+    while True:
+        job = outbox.lock_next(AdmissionTransfer.objects, now)
+        if job is None:
+            return None
+        if job.cycle_attempts < MAX_ATTEMPTS:
+            break
+        # Попытки исчерпаны: закрываем и берём следующее задание.
         job.status = "failed"
         job.last_error = "attempts_exhausted"
+        outbox.release(job)
         job.save()
-        return None
     outbox.take_lease(job, LEASE_SECONDS, now)
     job.attempt_count += 1
     job.cycle_attempts += 1

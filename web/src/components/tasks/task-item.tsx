@@ -18,16 +18,18 @@ export function TaskItem({
   root: string;
   leadHref: string;
   onEditing: (editing: boolean) => void;
-  onSaved: () => void;
+  onSaved: (task: Task) => void;
 }) {
-  const { busy, error, run } = useMutation(() => {
-    onEditing(false);
-    onSaved();
-  });
+  const { busy, error, run } = useMutation();
   const update = (data: Record<string, unknown>) =>
-    run(() =>
-      api(`${root}/tasks/${task.id}`, { ...data, version: task.version }),
-    );
+    run(async () => {
+      const saved = await api<Task>(`${root}/tasks/${task.id}`, {
+        ...data,
+        version: task.version,
+      });
+      onEditing(false);
+      onSaved(saved);
+    });
   return (
     <article className={`card task-item ${task.overdue ? "task-overdue" : ""}`}>
       <div className="section-title">

@@ -17,8 +17,8 @@ export const instagramReader: ConversationReader = {
   read(document) {
     const threadId = document.location.pathname.split("/")[3];
     if (!threadId) throw new ReadError("Откройте диалог в Instagram Direct.");
-    const grid =
-      document.querySelector<HTMLElement>("[role='grid']") || document.body;
+    const grid = document.querySelector<HTMLElement>("[role='grid']");
+    if (!grid) throw new ReadError("Откройте диалог в Instagram Direct.");
     const middle = grid.getBoundingClientRect().left + grid.clientWidth / 2;
     const rows = Array.from(grid.querySelectorAll<HTMLElement>("[role='row']"));
     const messages: ImportMessage[] = rows

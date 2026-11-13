@@ -39,6 +39,8 @@ def transfer_data(transfer):
                 "http_status": attempt.http_status,
                 "started_at": attempt.started_at.isoformat(),
             }
-            for attempt in transfer.attempts.order_by("-number")[:30]
+            for attempt in sorted(
+                transfer.attempts.all(), key=lambda a: a.number, reverse=True
+            )[:30]
         ],
     }

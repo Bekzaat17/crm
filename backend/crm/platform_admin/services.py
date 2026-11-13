@@ -23,6 +23,8 @@ def create_company(actor, data):
     require_platform_admin(actor)
     name = clean_text(data.get("name"), "Название компании", 160)
     raw_email = data.get("owner_email") or ""
+    if not isinstance(raw_email, str):
+        raise ApiError("Укажите корректный адрес электронной почты.")
     owner_email = clean_email(raw_email) if raw_email.strip() else actor.email
     self_owned = owner_email.lower() == actor.email.lower()
     organization = create_organization(actor, name, actor if self_owned else None)

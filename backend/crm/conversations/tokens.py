@@ -37,9 +37,19 @@ def visible_tokens(member):
     return tokens.select_related("user").order_by("-created_at")
 
 
+def revoke_user_tokens(user, organization_id=None):
+    """Отзыв ключей при отключении сотрудника или смене пароля: повторное
+    подключение или захват аккаунта не должны оживлять старые ключи."""
+    tokens = ExtensionToken.objects.filter(user=user, revoked_at__isnull=True)
+    if organization_id is not None:
+        tokens = tokens.filter(organization_id=organization_id)
+    return tokens.update(revoked_at=timezone.now())
+
+
 @transaction.atomic
 def issue_token(actor, company_id, data):
-    member = get_membership(actor, company_id)
+    # Блокировка компании: параллельные входы не превысят лимит ключей.
+    member = get_membership(actor, company_id, lock=True)
     active = ExtensionToken.objects.filter(
         organization_id=company_id,
         user=actor,
@@ -136,3 +146,9 @@ def authorize_extension(actor, data):
         }
     )
     return f"{redirect_uri}#{fragment}"
+
+
+def revoke_current(token):
+    ExtensionToken.objects.filter(pk=token.pk, revoked_at__isnull=True).update(
+        revoked_at=timezone.now()
+    )

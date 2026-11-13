@@ -2,7 +2,7 @@
 
 from datetime import timedelta
 
-from django.db import transaction
+from django.db import models, transaction
 from django.utils import timezone
 
 from crm.accounts.models import User
@@ -48,12 +48,14 @@ def invite_owner(actor, organization, email, mailer: Mailer | None = None):
     if has_owner(organization.id):
         raise ApiError("У компании уже есть владелец.", 409)
     now = timezone.now()
+    # Действует только последнее приглашение владельца, на любой адрес.
     Invitation.objects.filter(
         organization=organization,
-        email=email,
         accepted_at__isnull=True,
         revoked_at__isnull=True,
-    ).update(revoked_at=now)
+    ).filter(models.Q(role=Membership.Role.OWNER) | models.Q(email=email)).update(
+        revoked_at=now
+    )
     token = new_token()
     invitation = Invitation.objects.create(
         organization=organization,
@@ -171,7 +173,7 @@ def accept_invitation(token, current_user, data):
 
 @transaction.atomic
 def revoke_invitation(actor, organization_id, invitation_id):
-    get_membership(actor, organization_id, Perm.MANAGE_TEAM)
+    member = get_membership(actor, organization_id, Perm.MANAGE_TEAM, lock=True)
     invitation = (
         Invitation.objects.select_for_update()
         .filter(pk=invitation_id, organization_id=organization_id)
@@ -181,6 +183,9 @@ def revoke_invitation(actor, organization_id, invitation_id):
         raise ApiError("Приглашение не найдено.", 404)
     if invitation.accepted_at or invitation.revoked_at:
         raise ApiError("Приглашение уже закрыто.", 409)
+    require_manages(
+        member, invitation.role, "Это приглашение может отозвать только владелец."
+    )
     invitation.revoked_at = timezone.now()
     invitation.save(update_fields=["revoked_at"])
     audit.record(organization_id, actor, "invitation.revoked", invitation.id)
@@ -212,6 +217,10 @@ def deactivate_member(actor, organization_id, membership_id):
     )
     target.is_active = False
     target.save(update_fields=["is_active"])
+    # Импорт внутри функции: conversations зависит от organizations, не наоборот.
+    from crm.conversations.tokens import revoke_user_tokens
+
+    revoke_user_tokens(target.user, organization_id)
     audit.record(organization_id, actor, "membership.deactivated", target.id)
 
 

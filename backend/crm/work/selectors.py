@@ -32,8 +32,8 @@ def filtered_tasks(member, status):
     )
     filters = {
         "open": Q(completed_at__isnull=True),
-        "overdue": Q(completed_at__isnull=True, due_at__lt=now),
-        "today": Q(completed_at__isnull=True, due_at__gte=now, due_at__lt=tomorrow),
+        "overdue": Q(completed_at__isnull=True, due_at__lte=now),
+        "today": Q(completed_at__isnull=True, due_at__gt=now, due_at__lt=tomorrow),
         "completed": Q(completed_at__isnull=False),
         "all": Q(),
     }

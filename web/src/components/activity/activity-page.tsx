@@ -27,7 +27,7 @@ export function ActivityPage() {
         <article className="card">
           <div className="section-title">
             <h2>Управление компанией</h2>
-            <span className="small muted">Время Алматы</span>
+            <span className="small muted">Время вашего устройства</span>
           </div>
           <div className="activity-list full-activity">
             {data.events.map((e) => (

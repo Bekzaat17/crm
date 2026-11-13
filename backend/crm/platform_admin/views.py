@@ -3,16 +3,7 @@ from django.http import JsonResponse
 from crm.core.http import endpoint
 
 from . import selectors, services
-
-
-def company_data(organization):
-    return {
-        "id": str(organization.id),
-        "name": organization.name,
-        "created_at": organization.created_at.isoformat(),
-        "members": getattr(organization, "members", None),
-        "owner": selectors.owner_status(organization),
-    }
+from .serializers import company_data
 
 
 @endpoint(["GET", "POST"], authenticated=True)

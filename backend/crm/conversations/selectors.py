@@ -1,11 +1,28 @@
+from django.db.models import Prefetch
+
 from crm.sales.selectors import find_lead, leads_for
 
-from .models import Conversation
+from .models import Conversation, ImportBatch, Message
 
 
 def lead_conversations(member, lead_id):
     lead = find_lead(member, lead_id)
-    return Conversation.objects.filter(lead=lead).order_by("-updated_at")
+    return (
+        Conversation.objects.filter(lead=lead)
+        .prefetch_related(
+            Prefetch(
+                "messages",
+                queryset=Message.objects.order_by("batch__created_at", "position"),
+            ),
+            Prefetch(
+                "imports",
+                queryset=ImportBatch.objects.select_related("imported_by").order_by(
+                    "-created_at"
+                ),
+            ),
+        )
+        .order_by("-updated_at")
+    )
 
 
 def lead_search(member, query, limit=20):

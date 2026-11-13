@@ -16,8 +16,19 @@ export function parseStamp(stamp: string): string | null {
   // Точка — день.месяц (ru); косая черта с AM/PM — месяц/день (en-US).
   const [day, month] =
     stamp.includes("/") && meridiem ? [second, first] : [first, second];
+  if (
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31 ||
+    hours > 23 ||
+    minutes > 59
+  )
+    return null;
   const date = new Date(year, month - 1, day, hours, minutes);
-  return Number.isNaN(date.getTime()) ? null : toOffsetIso(date);
+  // new Date переносит 13-й месяц в следующий год: такой штамп отбрасываем.
+  if (date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+  return toOffsetIso(date);
 }
 
 export function toOffsetIso(date: Date): string {

@@ -35,3 +35,6 @@ def reset_password(data):
         raise ApiError("Ссылка недействительна или срок её действия истёк.")
     user.set_password(check_password(data.get("password"), user.email, user.name))
     user.save(update_fields=["password"])
+    from crm.conversations.tokens import revoke_user_tokens
+
+    revoke_user_tokens(user)

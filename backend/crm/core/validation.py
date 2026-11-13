@@ -36,11 +36,41 @@ def identifier(value):
         raise ApiError("Некорректный идентификатор.")
 
 
-def optional(data, key, length):
-    value = data.get(key, "")
-    if not isinstance(value, str) or len(value) > length:
-        raise ApiError(f"Поле {key}: не более {length} символов.")
-    return value.strip()
+FIELD_LABELS = {
+    "phone": "Телефон",
+    "city": "Город",
+    "notes": "Заметки",
+    "source": "Источник",
+    "refusal_reason": "Причина отказа",
+}
+
+
+def optional(data, key, length, label=None):
+    """Необязательная строка: отсутствие и null — пустая строка."""
+    value = data.get(key)
+    if value is None:
+        return ""
+    title = label or FIELD_LABELS.get(key, key)
+    if not isinstance(value, str):
+        raise ApiError(f"Поле «{title}» должно быть строкой.")
+    value = value.strip()
+    if len(value) > length:
+        raise ApiError(f"Поле «{title}»: не более {length} символов.")
+    return value
+
+
+def require_version(obj, data, message):
+    """Optimistic locking: клиент присылает прочитанную version."""
+    if data.get("version") != obj.version:
+        raise ApiError(message, 409)
+
+
+def unique_name(name, existing, message):
+    """Название без учёта регистра (casefold в Python: SQLite не сравнивает
+    кириллицу без учёта регистра)."""
+    if any(other.casefold() == name.casefold() for other in existing):
+        raise ApiError(message, 409)
+    return name
 
 
 def aware_datetime(value, message):

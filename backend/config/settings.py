@@ -7,7 +7,8 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR.parent / ".env")
-DEBUG = os.getenv("CRM_DEBUG", "1") == "1"
+# По умолчанию рабочий режим: локальный .env явно включает CRM_DEBUG=1.
+DEBUG = os.getenv("CRM_DEBUG", "0") == "1"
 SECRET_KEY = os.getenv("CRM_SECRET_KEY", "")
 if not SECRET_KEY:
     if not DEBUG:
@@ -134,5 +135,12 @@ EXTENSION_IDS = tuple(
     for x in os.getenv("CRM_EXTENSION_IDS", "bmpbpohmpkpikemmocmchnhccmcneolc").split(
         ","
     )
+    if x.strip()
+)
+
+# Прокси, которым разрешено передавать адрес клиента в X-Forwarded-For.
+TRUSTED_PROXIES = tuple(
+    x.strip()
+    for x in os.getenv("CRM_TRUSTED_PROXIES", "127.0.0.1,::1").split(",")
     if x.strip()
 )

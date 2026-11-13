@@ -205,11 +205,7 @@ class TrackingTests(ImportFixtures):
         return {"source": "whatsapp", "external_id": "77000000000@c.us", **extra}
 
     def test_track_lookup_untrack(self):
-        lookup = self.ext.get(
-            "/api/ext/conversations/lookup/",
-            self.chat(),
-            HTTP_AUTHORIZATION=f"Bearer {self.secret}",
-        ).json()
+        lookup = self.call("conversations/lookup", self.chat()).json()
         self.assertFalse(lookup["tracked"])
         tracked = self.call(
             "conversations/track",
@@ -217,11 +213,7 @@ class TrackingTests(ImportFixtures):
         ).json()
         self.assertTrue(tracked["tracked"])
         self.assertEqual(tracked["lead"]["id"], str(self.lead_record.id))
-        again = self.ext.get(
-            "/api/ext/conversations/lookup/",
-            self.chat(),
-            HTTP_AUTHORIZATION=f"Bearer {self.secret}",
-        ).json()
+        again = self.call("conversations/lookup", self.chat()).json()
         self.assertTrue(again["tracked"])
         self.assertFalse(
             self.call("conversations/untrack", self.chat()).json()["tracked"]

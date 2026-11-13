@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 /** Параметр URL с черновиком поля ввода: адрес обновляется после паузы ввода.
@@ -10,20 +10,39 @@ export function useUrlQuery(name: string, delay = 250) {
   const pathname = usePathname();
   const value = params.get(name) || "";
   const [draft, setDraft] = useState(value);
-  const set = (next: string) => {
-    const query = new URLSearchParams(params);
+  // Адрес изменился снаружи (Назад, ссылка в меню): черновик следует за ним.
+  const [synced, setSynced] = useState(value);
+  if (synced !== value) {
+    setSynced(value);
+    setDraft(value);
+  }
+  // Актуальные параметры на момент срабатывания таймера, а не на момент ввода.
+  const latest = useRef({ params, pathname });
+  useEffect(() => {
+    latest.current = { params, pathname };
+  }, [params, pathname]);
+
+  const write = (next: string) => {
+    const query = new URLSearchParams(latest.current.params);
     if (next) query.set(name, next);
     else query.delete(name);
     const suffix = query.toString();
-    router.replace(suffix ? `${pathname}?${suffix}` : pathname, {
-      scroll: false,
-    });
+    const path = latest.current.pathname;
+    router.replace(suffix ? `${path}?${suffix}` : path, { scroll: false });
+  };
+  const set = (next: string) => {
+    setDraft(next);
+    setSynced(next);
+    write(next);
   };
   useEffect(() => {
-    if (draft === value) return;
-    const timer = setTimeout(() => set(draft), delay);
+    if (draft === synced) return;
+    const timer = setTimeout(() => {
+      setSynced(draft);
+      write(draft);
+    }, delay);
     return () => clearTimeout(timer);
-    // set зависит от params и пути, которые уже отражены в value.
-  }, [draft, value, delay]);
+    // write читает актуальные параметры из ref.
+  }, [draft, synced, delay]);
   return { value, draft, setDraft, set };
 }

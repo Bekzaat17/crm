@@ -19,6 +19,8 @@ export type ImportResult = {
 };
 export type ChatRef = { source: Source; external_id: string };
 
+const LIMIT = 10000;
+
 export class CrmError extends Error {
   constructor(
     message: string,
@@ -72,10 +74,10 @@ export class CrmClient {
     );
   }
 
+  /** POST, а не GET: идентификатор чата (для WhatsApp — номер) не должен
+   *  попадать в журналы адресов сервера. */
   status(chat: ChatRef) {
-    return this.call<ChatStatus>(
-      `conversations/lookup/?${new URLSearchParams(chat)}`,
-    );
+    return this.call<ChatStatus>("conversations/lookup/", chat);
   }
 
   track(chat: ChatRef, title: string, leadId: string) {
@@ -95,9 +97,18 @@ export class CrmClient {
       idempotency_key: key,
       source: read.source,
       lead_id: leadId,
-      conversation: read.conversation,
-      messages: read.messages.slice(-500),
-      history_note: read.note,
+      conversation: {
+        external_id: read.conversation.external_id.slice(0, 200),
+        title: read.conversation.title.slice(0, 200) || "Диалог",
+      },
+      // Лимиты сервера: одно длинное сообщение не должно блокировать весь чат.
+      messages: read.messages.slice(-500).map((m) => ({
+        ...m,
+        external_id: m.external_id?.slice(0, 200),
+        author: m.author.slice(0, 200),
+        text: m.text.length > LIMIT ? `${m.text.slice(0, LIMIT - 1)}…` : m.text,
+      })),
+      history_note: read.note.slice(0, 300),
     });
   }
 }
@@ -108,9 +119,14 @@ export async function fragmentKey(read: ReadResult) {
   const material = JSON.stringify([
     read.source,
     read.conversation.external_id,
-    read.messages.map(
-      (m) => m.external_id || `${m.direction}|${m.sent_at}|${m.text}`,
-    ),
+    read.messages.map((m) => [
+      m.external_id || "",
+      m.direction,
+      m.author,
+      m.sent_at,
+      m.text,
+      m.has_attachment,
+    ]),
   ]);
   const hash = new Uint8Array(
     await crypto.subtle.digest("SHA-256", new TextEncoder().encode(material)),

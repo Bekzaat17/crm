@@ -7,6 +7,7 @@
 from datetime import timedelta
 
 from django.db import IntegrityError, transaction
+from django.db.models import Exists, OuterRef
 from django.utils import timezone
 
 from crm.sales.models import Lead, PipelineStage
@@ -24,14 +25,13 @@ TEXTS = {
 }
 
 
-def _remind(kind, object_id, due_at, member, lead):
-    user = member.user
+def _remind(kind, object_id, due_at, user, lead, channels):
     try:
         with transaction.atomic():
             ReminderDispatch.objects.create(
                 kind=kind, object_id=object_id, due_at=due_at, user=user
             )
-            for channel in enabled_channels(user):
+            for channel in channels:
                 enqueue(
                     channel=channel,
                     kind=f"reminder.{kind}",
@@ -49,34 +49,57 @@ def _remind(kind, object_id, due_at, member, lead):
     return 1
 
 
+def _not_sent(kind, object_ref, due_ref, user_ref):
+    """Ещё нет напоминания этому ответственному на этот срок."""
+    return ~Exists(
+        ReminderDispatch.objects.filter(
+            kind=kind,
+            object_id=OuterRef(object_ref),
+            due_at=OuterRef(due_ref),
+            user_id=OuterRef(user_ref),
+        )
+    )
+
+
 def schedule_reminders(now=None):
     now = now or timezone.now()
     since = now - WINDOW
+    channels_cache = {}
+
+    def channels(user):
+        if user.pk not in channels_cache:
+            channels_cache[user.pk] = enabled_channels(user)
+        return channels_cache[user.pk]
+
     created = 0
-    tasks = FollowUpTask.objects.filter(
-        completed_at__isnull=True,
-        due_at__lte=now,
-        due_at__gt=since,
-        lead__assignee__is_active=True,
-    ).select_related("lead__assignee__user")
+    tasks = (
+        FollowUpTask.objects.filter(
+            completed_at__isnull=True,
+            due_at__lte=now,
+            due_at__gt=since,
+            lead__assignee__is_active=True,
+        )
+        .filter(_not_sent("task", "pk", "due_at", "lead__assignee__user_id"))
+        .select_related("lead__assignee__user")
+    )
     for task in tasks:
-        if not ReminderDispatch.objects.filter(
-            kind="task", object_id=task.id, due_at=task.due_at
-        ).exists():
-            created += _remind(
-                "task", task.id, task.due_at, task.lead.assignee, task.lead
-            )
-    leads = Lead.objects.filter(
-        next_contact_at__lte=now,
-        next_contact_at__gt=since,
-        stage__kind=PipelineStage.Kind.OPEN,
-        assignee__is_active=True,
-    ).select_related("assignee__user")
+        user = task.lead.assignee.user
+        created += _remind(
+            "task", task.id, task.due_at, user, task.lead, channels(user)
+        )
+    leads = (
+        Lead.objects.filter(
+            next_contact_at__lte=now,
+            next_contact_at__gt=since,
+            stage__kind=PipelineStage.Kind.OPEN,
+            assignee__is_active=True,
+        )
+        .filter(_not_sent("contact", "pk", "next_contact_at", "assignee__user_id"))
+        .select_related("assignee__user")
+    )
     for lead in leads:
-        if not ReminderDispatch.objects.filter(
-            kind="contact", object_id=lead.id, due_at=lead.next_contact_at
-        ).exists():
-            created += _remind(
-                "contact", lead.id, lead.next_contact_at, lead.assignee, lead
-            )
+        user = lead.assignee.user
+        created += _remind(
+            "contact", lead.id, lead.next_contact_at, user, lead, channels(user)
+        )
     return created

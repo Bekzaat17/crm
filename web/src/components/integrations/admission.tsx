@@ -1,10 +1,11 @@
 "use client";
-import { useEffect, useState } from "react";
-import { api, errorMessage } from "@/lib/api";
+import { useState } from "react";
+import { api } from "@/lib/api";
 import { formatDateTime, todayInput } from "@/lib/format";
 import type { ClientRecord, LeadRecord } from "@/lib/types";
 import { useInterval } from "@/lib/use-interval";
 import { useMutation } from "@/lib/use-mutation";
+import { useResource } from "@/lib/use-resource";
 import { ErrorAlert } from "@/components/ui/feedback";
 import { fields } from "@/components/ui/form";
 
@@ -48,53 +49,35 @@ export function Admission({
   canSend: boolean;
   onSaved: () => void;
 }) {
-  const [centers, setCenters] = useState<Center[]>([]),
-    [client, setClient] = useState<ClientRecord | null>(null),
-    [transfers, setTransfers] = useState<Transfer[]>([]),
-    [error, setError] = useState(""),
-    [revision, setRevision] = useState(0),
-    [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  // Центры и карточка клиента не меняются во время опроса — грузим один раз.
+  const destinations = useResource<{ items: Center[] }>(`${root}/destinations`);
+  const card = useResource<ClientRecord>(`${root}/clients/${lead.client_id}`);
+  const history = useResource<{ items: Transfer[] }>(
+    `${root}/leads/${lead.id}/transfers`,
+  );
+  const centers = destinations.data?.items || [];
+  const client = card.data;
+  const transfers = history.data?.items || [];
+  const error = destinations.error || card.error || history.error;
   const {
     busy,
     error: mutationError,
     run,
   } = useMutation(() => {
-    setRevision((v) => v + 1);
+    history.reload();
+    card.reload();
     onSaved();
   });
-  useEffect(() => {
-    let active = true;
-    async function load() {
-      try {
-        const [destinations, card, history] = await Promise.all([
-          api<{ items: Center[] }>(`${root}/destinations`),
-          api<ClientRecord>(`${root}/clients/${lead.client_id}`),
-          api<{ items: Transfer[] }>(`${root}/leads/${lead.id}/transfers`),
-        ]);
-        if (active) {
-          setCenters(destinations.items);
-          setClient(card);
-          setTransfers(history.items);
-          setError("");
-        }
-      } catch (cause) {
-        if (active) setError(errorMessage(cause));
-      }
-    }
-    void load();
-    return () => {
-      active = false;
-    };
-  }, [root, lead.id, revision]);
   const inFlight = transfers.some((t) =>
     ["pending", "retry", "sending"].includes(t.status),
   );
-  // Пока передача в очереди, статус обновляется каждые 5 секунд.
-  useInterval(() => setRevision((v) => v + 1), inFlight ? 5000 : null);
+  // Пока передача в очереди, каждые 5 секунд обновляется только её статус.
+  useInterval(history.reload, inFlight ? 5000 : null);
   return (
     <section className="admission-section">
       <h3>Передача в RehubPro</h3>
-      <p className="small muted integration-intro">
+      <p className="card-intro">
         Создание резидента выполняется только после вашего подтверждения
         фактического поступления. Повторные попытки используют одну и ту же
         операцию.

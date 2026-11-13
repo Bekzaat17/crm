@@ -37,19 +37,16 @@ export function LeadsBoard() {
   );
 
   async function move(lead: LeadRecord, stage: Stage, reason?: string) {
-    const previous = list.items;
-    const counts = list.counts;
     setMoveError("");
     setMoving(lead.id);
-    // Оптимистично переносим карточку; при ошибке возвращаем прежнее состояние.
-    list.setItems((items) =>
-      items.map((l) => (l.id === lead.id ? { ...l, stage: stage.id } : l)),
-    );
-    list.setCounts({
-      ...counts,
-      [lead.stage]: Math.max(0, (counts[lead.stage] || 1) - 1),
-      [stage.id]: (counts[stage.id] || 0) + 1,
-    });
+    // Оптимистично переносим одну карточку; откатываем тоже только её, чтобы
+    // не потерять страницы, догруженные во время запроса.
+    const place = (stageId: string) =>
+      list.setItems((items) =>
+        items.map((l) => (l.id === lead.id ? { ...l, stage: stageId } : l)),
+      );
+    place(stage.id);
+    list.adjustCounts({ [lead.stage]: -1, [stage.id]: 1 });
     try {
       const saved = await api<LeadRecord>(`${root}/leads/${lead.id}`, {
         stage: stage.id,
@@ -60,8 +57,8 @@ export function LeadsBoard() {
         items.map((l) => (l.id === saved.id ? saved : l)),
       );
     } catch (cause) {
-      list.setItems(previous);
-      list.setCounts(counts);
+      place(lead.stage);
+      list.adjustCounts({ [lead.stage]: 1, [stage.id]: -1 });
       setMoveError(errorMessage(cause));
     } finally {
       setMoving(null);
@@ -130,7 +127,13 @@ export function LeadsBoard() {
           </select>
           <span className="muted small">Всего: {list.total}</span>
         </div>
-        <ErrorAlert message={meta.error || list.error} onRetry={list.reload} />
+        <ErrorAlert
+          message={meta.error || list.error}
+          onRetry={() => {
+            if (meta.error) meta.reload();
+            if (list.error) list.reload();
+          }}
+        />
         <ErrorAlert message={moveError} />
         {(list.loading && list.page === 1) || !meta.data ? (
           <LoadingState />

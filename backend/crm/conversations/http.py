@@ -5,7 +5,6 @@
 общего лимита Django и читается потоком с собственным ограничением.
 """
 
-import json
 from functools import wraps
 
 from django.db import IntegrityError
@@ -13,6 +12,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
 from crm.core.errors import ApiError
+from crm.core.http import parse_json_object
 from crm.core.throttle import throttle
 
 from .tokens import authenticate
@@ -28,13 +28,7 @@ def _payload(request):
     raw = request.read(MAX_BODY + 1)
     if len(raw) > MAX_BODY:
         raise ApiError("Слишком большой фрагмент переписки.", 413)
-    try:
-        payload = json.loads(raw)
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        raise ApiError("Некорректный JSON-запрос.")
-    if not isinstance(payload, dict):
-        raise ApiError("Ожидается объект JSON.")
-    return payload
+    return parse_json_object(raw)
 
 
 def extension_endpoint(methods):

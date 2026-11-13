@@ -1,10 +1,11 @@
 import {
   chatPhone,
   CrmClient,
+  CrmError,
   type ChatRef,
   type ChatStatus,
 } from "./crm-client.js";
-import { loadSettings, logout } from "./settings.js";
+import { loadSettings } from "./settings.js";
 import type { ReadResult } from "./types.js";
 
 const $ = <T extends HTMLElement>(id: string) =>
@@ -98,9 +99,22 @@ async function start() {
   }
   show("login-form", false);
   show("logout", true);
+  await chrome.action.setBadgeText({ text: "" });
   client = new CrmClient(settings);
   try {
-    const session = await client.session();
+    let session;
+    try {
+      session = await client.session();
+    } catch (error) {
+      // Ключ отозван или истёк: показываем вход вместо ошибки.
+      if (error instanceof CrmError && error.status === 401) {
+        await chrome.runtime.sendMessage({ type: "rehub:logout" });
+        await start();
+        status("Доступ закончился. Войдите снова.", true);
+        return;
+      }
+      throw error;
+    }
     $("account").textContent = `${session.company} · ${session.user}`;
     read = await readActiveTab();
     $("chat-title").textContent = read.conversation.title;
@@ -130,7 +144,7 @@ $("login-form").addEventListener("submit", async (event) => {
 });
 
 $("logout").addEventListener("click", async () => {
-  await logout();
+  await chrome.runtime.sendMessage({ type: "rehub:logout" });
   show("chat", false);
   $("account").textContent = "";
   await start();
@@ -184,9 +198,13 @@ $("untrack").addEventListener("click", async () => {
 
 $("sync").addEventListener("click", async () => {
   if (!tabId) return;
-  await chrome.runtime.sendMessage({ type: "rehub:status-changed" });
-  await chrome.tabs.sendMessage(tabId, { type: "rehub:resync" });
-  status("Синхронизация запущена.");
+  try {
+    await chrome.runtime.sendMessage({ type: "rehub:status-changed" });
+    await chrome.tabs.sendMessage(tabId, { type: "rehub:resync" });
+    status("Синхронизация запущена.");
+  } catch {
+    status("Обновите страницу мессенджера и попробуйте снова.", true);
+  }
 });
 
 void start();

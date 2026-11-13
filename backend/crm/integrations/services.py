@@ -6,13 +6,12 @@ from django.utils.dateparse import parse_date
 
 from crm.core.crypto import decrypt, encrypt
 from crm.core.errors import ApiError
-from crm.core.validation import clean_text, identifier
+from crm.core.validation import clean_text, identifier, require_version
 from crm.organizations import audit
 from crm.organizations.context import get_membership
 from crm.organizations.permissions import Perm
 from crm.sales.models import LeadActivity
 from crm.sales.selectors import find_lead
-from crm.sales.services import require_version
 
 from .address import normalize_domain
 from .models import AdmissionTransfer, RehubCenter

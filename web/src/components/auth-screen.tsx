@@ -54,6 +54,13 @@ export function AuthScreen({ mode }: { mode: Mode }) {
             : "");
         setToken(secret);
         setUid(fragment.get("uid") || "");
+        // Код из письма не остаётся в адресной строке и истории браузера.
+        if (window.location.hash)
+          window.history.replaceState(
+            null,
+            "",
+            window.location.pathname + window.location.search,
+          );
         const current = await api<Session>("auth/session");
         if (cancelled) return;
         setSession(current);
@@ -62,10 +69,16 @@ export function AuthScreen({ mode }: { mode: Mode }) {
           return;
         }
         if (mode === "invite" && secret) {
-          const preview = await api<Invitation>("invitations/preview", {
-            token: secret,
-          });
-          if (!cancelled) setInvitation(preview);
+          try {
+            const preview = await api<Invitation>("invitations/preview", {
+              token: secret,
+            });
+            if (!cancelled) setInvitation(preview);
+          } catch (cause) {
+            // Недействительное приглашение не должно перехватывать будущие входы.
+            sessionStorage.removeItem("crm-pending-invite");
+            throw cause;
+          }
         }
         if (["invite", "reset"].includes(mode) && !secret)
           setError(

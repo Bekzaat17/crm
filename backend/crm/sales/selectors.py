@@ -5,8 +5,6 @@ from crm.organizations.permissions import policy_for
 
 from .models import Client, Lead
 
-PAGE_SIZE = 50
-
 
 def leads_for(member):
     queryset = Lead.objects.filter(organization_id=member.organization_id)
@@ -23,7 +21,13 @@ def find_client(member, pk, lock=False):
     if not clients_for(member).filter(pk=pk).exists():
         raise ApiError("Клиент не найден.", 404)
     queryset = Client.objects.filter(pk=pk, organization_id=member.organization_id)
-    return queryset.select_for_update().get() if lock else queryset.get()
+    if not lock:
+        return queryset.get()
+    client = queryset.select_for_update().get()
+    # Пока ждали блокировку, доступ могли отозвать (переназначение обращения).
+    if not clients_for(member).filter(pk=pk).exists():
+        raise ApiError("Клиент не найден.", 404)
+    return client
 
 
 def find_lead(member, pk, lock=False):
@@ -34,16 +38,3 @@ def find_lead(member, pk, lock=False):
     if not lead:
         raise ApiError("Обращение не найдено.", 404)
     return lead
-
-
-def page(queryset, value):
-    try:
-        number = int(value)
-        if number < 1 or number > 100000:
-            raise ValueError
-    except ValueError:
-        raise ApiError("Некорректный номер страницы.")
-    total = queryset.count()
-    start = (number - 1) * PAGE_SIZE
-    rows = list(queryset[start : start + PAGE_SIZE])
-    return rows, total, number * PAGE_SIZE < total

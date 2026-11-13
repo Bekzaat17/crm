@@ -26,7 +26,8 @@ export async function login() {
     url,
     interactive: true,
   });
-  const params = new URLSearchParams(new URL(result || "").hash.slice(1));
+  if (!result) throw new Error("Вход не завершён. Повторите подключение.");
+  const params = new URLSearchParams(new URL(result).hash.slice(1));
   if (params.get("state") !== state || !params.get("token"))
     throw new Error("Вход не завершён. Повторите подключение.");
   await chrome.storage.local.set({
@@ -35,6 +36,19 @@ export async function login() {
   });
 }
 
+/** Выход отзывает ключ в CRM, чтобы он не оставался действующим 90 дней. */
 export async function logout() {
+  const settings = await loadSettings();
+  if (settings.key) {
+    await fetch(`${CRM_URL}/api/ext/session/revoke/`, {
+      method: "POST",
+      credentials: "omit",
+      headers: {
+        Authorization: `Bearer ${settings.key}`,
+        "Content-Type": "application/json",
+      },
+      body: "{}",
+    }).catch(() => undefined);
+  }
   await chrome.storage.local.remove(["key", "company"]);
 }

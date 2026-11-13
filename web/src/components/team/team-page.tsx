@@ -274,6 +274,7 @@ export function TeamPage() {
             setTransferring(false);
             setNotice("Владение компанией передано. Вы теперь администратор.");
             reloadCompany();
+            team.reload();
           }}
         />
       )}

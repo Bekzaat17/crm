@@ -11,9 +11,11 @@ import re
 
 from django.db import transaction
 from django.db.models import Count, F
+from django.utils import timezone
 
 from crm.core.errors import ApiError
-from crm.core.validation import clean_text, identifier
+from crm.core.validation import clean_text, identifier, require_version, unique_name
+from crm.organizations import audit
 from crm.organizations.context import get_membership
 from crm.organizations.permissions import Perm
 
@@ -104,29 +106,39 @@ def _require_kind_remains(company_id, kind, excluding):
         )
 
 
+def _unique(company_id, name, excluding=None):
+    others = active_stages(company_id).exclude(pk=excluding)
+    return unique_name(
+        name,
+        others.values_list("name", flat=True),
+        "Активный этап с таким названием уже есть.",
+    )
+
+
 @transaction.atomic
 def create_stage(actor, company_id, data):
     get_membership(actor, company_id, Perm.MANAGE_PIPELINE, lock=True)
     if active_stages(company_id).count() >= MAX_STAGES:
         raise ApiError(f"В воронке может быть не более {MAX_STAGES} этапов.")
     last = active_stages(company_id).order_by("-position").first()
-    return PipelineStage.objects.create(
+    stage = PipelineStage.objects.create(
         organization_id=company_id,
-        name=_name(data),
+        name=_unique(company_id, _name(data)),
         kind=_kind(data.get("kind", Kind.OPEN)),
         color=_color(data.get("color")),
         position=(last.position + 1) if last else 0,
     )
+    audit.record(company_id, actor, "stage.created", stage.id)
+    return stage
 
 
 @transaction.atomic
 def update_stage(actor, company_id, stage_id, data):
     get_membership(actor, company_id, Perm.MANAGE_PIPELINE, lock=True)
     stage = find_stage(company_id, stage_id, lock=True)
-    if data.get("version") != stage.version:
-        raise ApiError("Этап изменился. Обновите настройки воронки.", 409)
+    require_version(stage, data, "Этап изменился. Обновите настройки воронки.")
     if "name" in data:
-        stage.name = _name(data)
+        stage.name = _unique(company_id, _name(data), stage.pk)
     if "color" in data:
         stage.color = _color(data["color"])
     if "kind" in data and _kind(data["kind"]) != stage.kind:
@@ -138,6 +150,7 @@ def update_stage(actor, company_id, stage_id, data):
         stage.kind = data["kind"]
     stage.version += 1
     stage.save()
+    audit.record(company_id, actor, "stage.updated", stage.id)
     return stage
 
 
@@ -154,6 +167,7 @@ def reorder_stages(actor, company_id, data):
             stage.position = position
             stage.version += 1
             stage.save(update_fields=["position", "version"])
+    audit.record(company_id, actor, "stage.reordered")
     return list(active_stages(company_id))
 
 
@@ -170,7 +184,10 @@ def archive_stage(actor, company_id, stage_id, data):
         target = find_stage(company_id, data["move_to"])
         if target.pk == stage.pk or target.kind != stage.kind:
             raise ApiError("Обращения можно перенести только в этап того же типа.")
-        Lead.objects.filter(pk__in=moved).update(stage=target, version=F("version") + 1)
+        # bulk update не трогает auto_now: перенесённые обращения поднимаются на доске.
+        Lead.objects.filter(pk__in=moved).update(
+            stage=target, version=F("version") + 1, updated_at=timezone.now()
+        )
         LeadActivity.objects.bulk_create(
             LeadActivity(
                 lead_id=pk,
@@ -183,6 +200,7 @@ def archive_stage(actor, company_id, stage_id, data):
     stage.is_active = False
     stage.version += 1
     stage.save(update_fields=["is_active", "version"])
+    audit.record(company_id, actor, "stage.archived", stage.id)
     return stage, len(moved)
 
 
@@ -194,11 +212,11 @@ def restore_stage(actor, company_id, stage_id):
         return stage
     if active_stages(company_id).count() >= MAX_STAGES:
         raise ApiError(f"В воронке может быть не более {MAX_STAGES} этапов.")
-    if active_stages(company_id).filter(name=stage.name).exists():
-        raise ApiError("Активный этап с таким названием уже есть.", 409)
+    _unique(company_id, stage.name)
     last = active_stages(company_id).order_by("-position").first()
     stage.is_active = True
     stage.position = (last.position + 1) if last else 0
     stage.version += 1
     stage.save(update_fields=["is_active", "position", "version"])
+    audit.record(company_id, actor, "stage.restored", stage.id)
     return stage

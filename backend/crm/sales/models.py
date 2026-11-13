@@ -97,7 +97,15 @@ class Lead(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        indexes = [models.Index(fields=["organization", "stage", "-updated_at"])]
+        indexes = [
+            models.Index(fields=["organization", "stage", "-updated_at"]),
+            # Напоминания и «Пора связаться» ищут наступивший следующий контакт.
+            models.Index(
+                fields=["next_contact_at"],
+                condition=models.Q(next_contact_at__isnull=False),
+                name="crm_lead_next_contact_idx",
+            ),
+        ]
 
 
 class LeadActivity(models.Model):

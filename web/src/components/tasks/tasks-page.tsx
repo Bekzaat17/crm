@@ -19,6 +19,13 @@ const FILTERS = [
   ["all", "Все задачи"],
 ];
 
+function matches(task: Task, status: string) {
+  if (status === "all") return true;
+  if (status === "completed") return task.completed;
+  if (task.completed) return false;
+  return status === "overdue" ? task.overdue : true;
+}
+
 export function TasksPage() {
   const { root, base } = useCompany();
   const { item, eyebrow } = useSection();
@@ -86,7 +93,16 @@ export function TasksPage() {
               root={root}
               leadHref={`${base}/leads/${task.lead_id}`}
               onEditing={setEditing}
-              onSaved={refresh}
+              onSaved={(saved) => {
+                // Строка обновляется на месте; если задача больше не подходит
+                // под фильтр (выполнена в «Открытых»), она убирается из списка.
+                tasks.setItems((items) =>
+                  items
+                    .map((t) => (t.id === saved.id ? saved : t))
+                    .filter((t) => t.id !== saved.id || matches(t, status)),
+                );
+                contacts.reload();
+              }}
             />
           ))}
         </div>

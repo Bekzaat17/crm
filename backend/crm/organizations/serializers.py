@@ -2,7 +2,7 @@ from django.utils import timezone
 
 from . import audit
 from .models import Membership
-from .permissions import Perm, assignable_roles, can, granted, policy_for
+from .permissions import assignable_roles, granted, policy_for
 
 
 def company_data(membership):
@@ -19,7 +19,6 @@ def organization_data(membership):
     return {
         **company_data(membership),
         "permissions": granted(membership),
-        "can_manage_team": can(membership, Perm.MANAGE_TEAM),
         "branches": [
             branch_data(b) for b in org.branches.filter(is_active=True).order_by("name")
         ],

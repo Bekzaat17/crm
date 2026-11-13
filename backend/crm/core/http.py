@@ -1,6 +1,4 @@
 import json
-import logging
-import smtplib
 from functools import wraps
 
 from django.db import IntegrityError
@@ -8,7 +6,16 @@ from django.http import JsonResponse
 
 from .errors import ApiError
 
-logger = logging.getLogger(__name__)
+
+def parse_json_object(raw):
+    """JSON-объект из тела запроса; любые ошибки разбора — 400."""
+    try:
+        payload = json.loads(raw)
+    except (ValueError, UnicodeDecodeError, RecursionError):
+        raise ApiError("Некорректный JSON-запрос.")
+    if not isinstance(payload, dict):
+        raise ApiError("Ожидается объект JSON.")
+    return payload
 
 
 def _read_payload(request):
@@ -16,13 +23,7 @@ def _read_payload(request):
         return {}
     if request.content_type != "application/json":
         raise ApiError("Ожидается JSON-запрос.", 415)
-    try:
-        payload = json.loads(request.body)
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        raise ApiError("Некорректный JSON-запрос.")
-    if not isinstance(payload, dict):
-        raise ApiError("Ожидается объект JSON.")
-    return payload
+    return parse_json_object(request.body)
 
 
 def endpoint(methods, authenticated=False):
@@ -50,12 +51,6 @@ def endpoint(methods, authenticated=False):
                         "error": "Данные уже изменены. Обновите страницу и повторите действие."
                     },
                     status=409,
-                )
-            except (smtplib.SMTPException, OSError):
-                logger.warning("Сервис отправки почты недоступен")
-                return JsonResponse(
-                    {"error": "Не удалось отправить письмо. Попробуйте позже."},
-                    status=503,
                 )
 
         return wrapped

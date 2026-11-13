@@ -22,7 +22,9 @@ export function NotificationSettings() {
   const [linkUrl, setLinkUrl] = useState("");
   const [browserSubscribed, setBrowserSubscribed] = useState(false);
   useEffect(() => {
-    void currentSubscription().then((s) => setBrowserSubscribed(Boolean(s)));
+    currentSubscription()
+      .then((s) => setBrowserSubscribed(Boolean(s)))
+      .catch(() => setBrowserSubscribed(false));
   }, []);
   const update = (values: Partial<Flags>) =>
     action.run(async () => settings.setData(await api<State>(PATH, values)));

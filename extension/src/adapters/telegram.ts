@@ -17,16 +17,39 @@ function messageText(element: Element | null) {
   return (copy.innerText ?? copy.textContent ?? "").trim();
 }
 
-function peerId(location: Location) {
-  // web.telegram.org/k/#@username или #-100123…, /a/#123…
-  const id = decodeURIComponent(location.hash.replace(/^#/, "")).split("?")[0];
+/** Числовой id собеседника из разметки, иначе из адреса (#@username или #123). */
+function peerId(document: Document, container: Element) {
+  const fromPage = container
+    .closest(".chat, #MiddleColumn")
+    ?.querySelector("[data-peer-id]")
+    ?.getAttribute("data-peer-id");
+  const fromHash = decodeURIComponent(
+    document.location.hash.replace(/^#/, ""),
+  ).split("?")[0];
+  const id = fromPage || fromHash;
   if (!id) throw new ReadError("Откройте диалог в Telegram Web.");
   return id;
 }
 
+/** Список сообщений открытого чата. Предыдущий чат может оставаться в DOM
+ *  во время анимации перехода, поэтому берём видимый активный контейнер. */
+function activeContainer(document: Document, versionA: boolean) {
+  const selector = versionA
+    ? "#MiddleColumn .MessageList"
+    : ".chat.active .bubbles-inner, .bubbles-inner";
+  const visible = Array.from(document.querySelectorAll(selector)).filter(
+    (el) => (el as HTMLElement).offsetParent !== null,
+  );
+  const container = visible.at(-1) || document.querySelector(selector);
+  if (!container) throw new ReadError("Откройте диалог в Telegram Web.");
+  return container;
+}
+
 /** Telegram Web K: пузыри .bubble[data-mid], data-timestamp в секундах. */
-function readWebK(document: Document): ImportMessage[] {
-  return Array.from(document.querySelectorAll<HTMLElement>(".bubble[data-mid]"))
+function readWebK(container: Element): ImportMessage[] {
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(".bubble[data-mid]"),
+  )
     .filter((bubble) => !bubble.classList.contains("service"))
     .map((bubble) => {
       const timestamp = Number(bubble.dataset.timestamp);
@@ -47,9 +70,9 @@ function readWebK(document: Document): ImportMessage[] {
 }
 
 /** Telegram Web A: .Message[data-message-id], исходящие с классом own. */
-function readWebA(document: Document): ImportMessage[] {
+function readWebA(container: Element): ImportMessage[] {
   return Array.from(
-    document.querySelectorAll<HTMLElement>(".Message[data-message-id]"),
+    container.querySelectorAll<HTMLElement>(".Message[data-message-id]"),
   ).map(
     (message) =>
       ({
@@ -78,10 +101,10 @@ export const telegramReader: ConversationReader = {
   source: "telegram",
   matches: (location) => location.hostname === "web.telegram.org",
   read(document) {
-    const location = document.location;
-    const versionA = location.pathname.startsWith("/a");
+    const versionA = document.location.pathname.startsWith("/a");
+    const container = activeContainer(document, versionA);
     const messages = (
-      versionA ? readWebA(document) : readWebK(document)
+      versionA ? readWebA(container) : readWebK(container)
     ).filter((m) => m.text || m.has_attachment);
     if (!messages.length)
       throw new ReadError("В диалоге нет загруженных сообщений.");
@@ -102,7 +125,7 @@ export const telegramReader: ConversationReader = {
       );
     return {
       source: "telegram",
-      conversation: { external_id: peerId(location), title },
+      conversation: { external_id: peerId(document, container), title },
       messages,
       note: `Telegram Web ${versionA ? "A" : "K"}: загружено на странице ${messages.length} сообщ.`,
       warnings,

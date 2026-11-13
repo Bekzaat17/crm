@@ -7,7 +7,7 @@ from crm.organizations.context import get_membership
 from . import tokens, tracking
 from .http import extension_endpoint
 from .selectors import lead_conversations, lead_search
-from .serializers import conversation_data, token_data
+from .serializers import conversation_data, lead_option, token_data
 from .services import import_fragment
 
 # --- Кабинет CRM (сессия и CSRF) ---
@@ -69,12 +69,7 @@ def ext_leads(request):
     return JsonResponse(
         {
             "items": [
-                {
-                    "id": str(lead.id),
-                    "title": lead.title,
-                    "client_name": lead.client.name,
-                    "stage": lead.stage.name,
-                }
+                lead_option(lead)
                 for lead in lead_search(request.extension.member, query)
             ]
         }
@@ -87,9 +82,17 @@ def ext_import(request):
     return JsonResponse(result, status=201 if created else 200)
 
 
-@extension_endpoint(["GET"])
+@extension_endpoint(["POST"])
 def ext_lookup(request):
-    return JsonResponse(tracking.lookup(request.extension.member, request.GET))
+    # POST: идентификатор чата (номер WhatsApp) не попадает в журналы адресов.
+    return JsonResponse(tracking.lookup(request.extension.member, request.payload))
+
+
+@extension_endpoint(["POST"])
+def ext_revoke(request):
+    """Выход из расширения отзывает его ключ."""
+    tokens.revoke_current(request.extension.token)
+    return JsonResponse({"revoked": True})
 
 
 @extension_endpoint(["POST"])
@@ -105,16 +108,4 @@ def ext_untrack(request):
 @extension_endpoint(["GET"])
 def ext_match(request):
     leads = tracking.match_leads(request.extension.member, request.GET.get("phone"))
-    return JsonResponse(
-        {
-            "items": [
-                {
-                    "id": str(lead.id),
-                    "title": lead.title,
-                    "client_name": lead.client.name,
-                    "stage": lead.stage.name,
-                }
-                for lead in leads
-            ]
-        }
-    )
+    return JsonResponse({"items": [lead_option(lead) for lead in leads]})

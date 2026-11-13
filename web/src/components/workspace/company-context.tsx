@@ -6,12 +6,12 @@ import {
   useEffect,
   useMemo,
 } from "react";
-import { useRouter } from "next/navigation";
 import { LockKeyhole } from "lucide-react";
 import Link from "next/link";
 import type { Session } from "@/lib/api";
 import type { Organization, Perm } from "@/lib/types";
 import { useResource } from "@/lib/use-resource";
+import { useSession } from "@/lib/use-session";
 import { rememberCompany } from "@/lib/storage";
 import { ErrorAlert, LoadingState } from "@/components/ui/feedback";
 
@@ -43,15 +43,10 @@ export function CompanyProvider({
   companyId: string;
   children: React.ReactNode;
 }) {
-  const router = useRouter();
-  const session = useResource<Session>("auth/session");
+  const session = useSession();
   const organization = useResource<Organization>(
     session.data?.user ? `organizations/${companyId}` : null,
   );
-  useEffect(() => {
-    if (session.data && !session.data.user) router.replace("/login");
-    if (organization.status === 401) router.replace("/login");
-  }, [session.data, organization.status, router]);
   useEffect(() => {
     if (organization.data) rememberCompany(companyId);
   }, [organization.data, companyId]);

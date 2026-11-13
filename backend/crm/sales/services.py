@@ -4,7 +4,7 @@ from django.db import transaction
 
 from crm.core.errors import ApiError
 from crm.core.phones import phone_digits
-from crm.core.validation import clean_text, identifier, optional
+from crm.core.validation import clean_text, identifier, optional, require_version
 from crm.organizations import audit
 from crm.organizations.context import get_membership
 from crm.organizations.models import Branch, Membership
@@ -17,16 +17,14 @@ from .selectors import find_client, find_lead
 from .validation import client_fields
 
 
-def require_version(obj, data, message):
-    if data.get("version") != obj.version:
-        raise ApiError(message, 409)
-
-
+@transaction.atomic
 def create_client(actor, company_id, data):
     get_membership(actor, company_id)
-    return Client.objects.create(
+    client = Client.objects.create(
         organization_id=company_id, created_by=actor, **client_fields(data)
     )
+    audit.record(company_id, actor, "client.created", client.id)
+    return client
 
 
 @transaction.atomic
@@ -38,13 +36,24 @@ def update_client(actor, company_id, client_id, data):
         setattr(client, key, value)
     client.version += 1
     client.save()
+    audit.record(company_id, actor, "client.updated", client.id)
     return client
 
 
+def _touch_client(client):
+    """Контакты входят в снимок передачи: их изменение меняет версию карточки,
+    и подтверждение по устаревшему предпросмотру отклоняется."""
+    client.version += 1
+    client.save(update_fields=["version", "updated_at"])
+
+
+@transaction.atomic
 def create_contact(actor, company_id, client_id, data):
     member = get_membership(actor, company_id)
-    client = find_client(member, client_id)
-    return RelatedContact.objects.create(client=client, **_contact_fields(data))
+    client = find_client(member, client_id, lock=True)
+    contact = RelatedContact.objects.create(client=client, **_contact_fields(data))
+    _touch_client(client)
+    return contact
 
 
 def _contact_fields(data):
@@ -79,6 +88,7 @@ def update_contact(actor, company_id, client_id, contact_id, data):
         setattr(contact, key, value)
     contact.version += 1
     contact.save()
+    _touch_client(contact.client)
     audit.record(company_id, actor, "contact.updated", contact.id)
     return contact
 
@@ -88,7 +98,9 @@ def delete_contact(actor, company_id, client_id, contact_id):
     member = get_membership(actor, company_id)
     contact = _find_contact(member, client_id, contact_id)
     audit.record(company_id, actor, "contact.deleted", contact.id)
+    client = contact.client
     contact.delete()
+    _touch_client(client)
 
 
 def company_assignee(company_id, value):
@@ -140,7 +152,9 @@ def create_lead(actor, company_id, data):
 
 @transaction.atomic
 def update_lead(actor, company_id, lead_id, data):
-    member = get_membership(actor, company_id, lock=True)
+    # Компания блокируется только при смене ответственного (сериализация с
+    # отключением сотрудников); перенос на доске блокирует лишь своё обращение.
+    member = get_membership(actor, company_id, lock="assignee_id" in data)
     lead = find_lead(member, lead_id, lock=True)
     require_version(lead, data, "Обращение изменилось. Откройте его заново.")
     changes = apply_changes(

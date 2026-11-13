@@ -2,8 +2,9 @@ from django.http import JsonResponse
 from django.utils import timezone
 
 from crm.core.http import endpoint
+from crm.core.pagination import page
 from crm.organizations.context import get_membership
-from crm.sales.selectors import leads_for, page
+from crm.sales.selectors import leads_for
 from crm.sales.serializers import lead_data
 
 from .selectors import filtered_tasks, open_leads, sales_summary

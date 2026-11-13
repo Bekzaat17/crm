@@ -13,7 +13,7 @@ from .channels import Content, DeliveryError, channel_for
 from .models import OutboundMessage
 
 MAX_ATTEMPTS = 8
-LEASE_SECONDS = 60
+LEASE_SECONDS = 300
 FINAL = (
     OutboundMessage.Status.SENT,
     OutboundMessage.Status.FAILED,
@@ -30,16 +30,18 @@ def _wipe(message):
 @transaction.atomic
 def claim_next():
     now = timezone.now()
-    job = outbox.lock_next(OutboundMessage.objects, now)
-    if job is None:
-        return None
-    if job.attempts >= MAX_ATTEMPTS:
+    while True:
+        job = outbox.lock_next(OutboundMessage.objects, now)
+        if job is None:
+            return None
+        if job.attempts < MAX_ATTEMPTS:
+            break
+        # Попытки исчерпаны: закрываем и берём следующее сообщение.
         job.status = OutboundMessage.Status.FAILED
         job.last_error = "attempts_exhausted"
         outbox.release(job)
         _wipe(job)
         job.save()
-        return None
     outbox.take_lease(job, LEASE_SECONDS, now)
     job.attempts += 1
     job.save()

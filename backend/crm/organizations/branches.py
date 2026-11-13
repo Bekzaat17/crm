@@ -3,7 +3,7 @@
 from django.db import transaction
 
 from crm.core.errors import ApiError
-from crm.core.validation import clean_text, identifier
+from crm.core.validation import clean_text, identifier, require_version, unique_name
 
 from . import audit
 from .context import get_membership
@@ -35,13 +35,12 @@ def find_branch(company_id, branch_id, lock=False, active=None):
 
 
 def _unique_name(company_id, name, excluding=None):
-    # casefold в Python: SQLite не сравнивает кириллицу без учёта регистра.
     others = Branch.objects.filter(organization_id=company_id).exclude(pk=excluding)
-    if any(
-        n.casefold() == name.casefold() for n in others.values_list("name", flat=True)
-    ):
-        raise ApiError("Филиал с таким названием уже есть.", 409)
-    return name
+    return unique_name(
+        name,
+        others.values_list("name", flat=True),
+        "Филиал с таким названием уже есть.",
+    )
 
 
 @transaction.atomic
@@ -61,8 +60,7 @@ def create_branch(actor, company_id, data):
 def rename_branch(actor, company_id, branch_id, data):
     get_membership(actor, company_id, Perm.MANAGE_BRANCHES, lock=True)
     branch = find_branch(company_id, branch_id, lock=True)
-    if data.get("version") != branch.version:
-        raise ApiError("Филиал изменился. Обновите список.", 409)
+    require_version(branch, data, "Филиал изменился. Обновите список.")
     name = clean_text(data.get("name"), "Название филиала", 160)
     branch.name = _unique_name(company_id, name, branch.pk)
     branch.version += 1

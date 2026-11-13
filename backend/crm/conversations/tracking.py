@@ -11,16 +11,7 @@ from crm.sales.models import LeadActivity, PipelineStage
 from crm.sales.selectors import clients_for, find_lead, leads_for
 
 from .models import Conversation, Source
-
-
-def _source(value):
-    if value not in Source.values:
-        raise ApiError("Источник должен быть WhatsApp, Telegram или Instagram.")
-    return value
-
-
-def _external_id(data):
-    return clean_text(data.get("external_id"), "Идентификатор диалога", 200)
+from .validation import clean_external_id, clean_source
 
 
 def _visible(member, source, external_id):
@@ -55,13 +46,22 @@ def summary(conversation):
 
 
 def lookup(member, query):
-    return summary(_visible(member, _source(query.get("source")), _external_id(query)))
+    return summary(
+        _visible(
+            member,
+            clean_source(query.get("source")),
+            clean_external_id(query.get("external_id")),
+        )
+    )
 
 
 @transaction.atomic
 def track(context, data):
     member = context.member
-    source, external_id = _source(data.get("source")), _external_id(data)
+    source, external_id = (
+        clean_source(data.get("source")),
+        clean_external_id(data.get("external_id")),
+    )
     lead = find_lead(member, identifier(data.get("lead_id")), lock=True)
     title = clean_text(data.get("title"), "Название диалога", 200)
     conversation, created = Conversation.objects.select_for_update().get_or_create(
@@ -71,7 +71,9 @@ def track(context, data):
         defaults=dict(lead=lead, title=title, created_by=member.user),
     )
     if not created and conversation.lead_id != lead.id:
-        if conversation.messages.exists():
+        # Чат привязан к обращению, которое сотрудник не видит: не трогаем.
+        visible = leads_for(member).filter(pk=conversation.lead_id).exists()
+        if not visible or conversation.messages.exists():
             raise ApiError(
                 "Этот чат уже привязан к другому обращению. Измените привязку в CRM.",
                 409,
@@ -92,11 +94,21 @@ def track(context, data):
 @transaction.atomic
 def untrack(context, data):
     member = context.member
-    conversation = _visible(member, _source(data.get("source")), _external_id(data))
+    conversation = _visible(
+        member,
+        clean_source(data.get("source")),
+        clean_external_id(data.get("external_id")),
+    )
     if conversation is None:
         raise ApiError("Чат не отслеживается.", 404)
     conversation.tracking = False
     conversation.save(update_fields=["tracking", "updated_at"])
+    LeadActivity.objects.create(
+        lead=conversation.lead,
+        actor=member.user,
+        kind="import",
+        text=f"Выключено отслеживание чата {conversation.get_source_display()}",
+    )
     return summary(conversation)
 
 

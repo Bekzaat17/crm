@@ -18,10 +18,7 @@
 .sidebar .brand-light {
   color: var(--ink);
 }
-.brand-mark {
-  background: var(--primary-tint);
-  color: var(--primary);
-}
+
 .company-switch {
   background: var(--canvas);
   border-color: var(--line);
@@ -59,7 +56,6 @@
   background: #dbeafe;
   color: var(--primary);
 }
-.nav-upcoming > div,
 .workspace-safety {
   color: var(--muted);
 }
@@ -80,28 +76,14 @@
 .button.primary:hover:not(:disabled) {
   background: var(--primary-hover);
 }
-.welcome-card {
-  background: var(--primary-tint);
-  border-color: #dbeafe;
-}
-.welcome-label,
-.welcome-copy > p {
-  color: #526b95;
-}
-.welcome-button {
-  color: var(--primary);
-  border-color: #bfdbfe;
-}
+
 .heading-dot {
   color: var(--primary);
 }
 .auth-story {
   background: var(--primary-dark);
 }
-.auth-story .brand-mark {
-  background: #dbeafe;
-  color: var(--primary-dark);
-}
+
 .sales-metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -401,13 +383,7 @@ td select {
 .settings-row > svg {
   color: var(--primary);
 }
-.secret-value {
-  display: block;
-  margin-top: 8px;
-  font-size: 12px;
-  overflow-wrap: anywhere;
-  user-select: all;
-}
+
 .conversation summary {
   cursor: pointer;
   font-size: 13px;

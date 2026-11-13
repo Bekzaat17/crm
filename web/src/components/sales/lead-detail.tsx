@@ -19,7 +19,13 @@ export function LeadDetail() {
   const meta = useResource<PipelineMeta>(`${root}/pipeline`);
   if (lead.error || meta.error)
     return (
-      <ErrorAlert message={lead.error || meta.error} onRetry={lead.reload} />
+      <ErrorAlert
+        message={lead.error || meta.error}
+        onRetry={() => {
+          if (lead.error) lead.reload();
+          if (meta.error) meta.reload();
+        }}
+      />
     );
   if (!lead.data || !meta.data) return <LoadingState />;
   const record = lead.data;

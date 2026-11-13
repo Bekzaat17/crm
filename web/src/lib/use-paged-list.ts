@@ -10,6 +10,10 @@ export function usePagedList<T extends { id: string }>(
 ) {
   const key = `${path}?${new URLSearchParams(query)}`;
   const [cursor, setCursor] = useState({ key, page: 1, revision: 0 });
+  // Новый фильтр — снова первая страница. Сброс при рендере, чтобы при
+  // возврате к прежнему фильтру не взять его старый номер страницы.
+  if (cursor.key !== key)
+    setCursor({ key, page: 1, revision: cursor.revision });
   const page = cursor.key === key ? cursor.page : 1;
   const revision = cursor.revision;
   const [items, setItems] = useState<T[]>([]);
@@ -61,8 +65,14 @@ export function usePagedList<T extends { id: string }>(
     total: meta.total,
     hasMore: meta.has_more,
     counts: meta.counts || {},
-    setCounts: (counts: Record<string, number>) =>
-      setMeta((m) => ({ ...m, counts })),
+    /** Изменить счётчики относительно текущих значений (+1/−1). */
+    adjustCounts: (delta: Record<string, number>) =>
+      setMeta((m) => {
+        const counts = { ...(m.counts || {}) };
+        for (const [key, value] of Object.entries(delta))
+          counts[key] = Math.max(0, (counts[key] || 0) + value);
+        return { ...m, counts };
+      }),
     page,
     loading,
     error,

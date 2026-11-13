@@ -23,7 +23,7 @@
       "matches": [
         "https://web.whatsapp.com/*",
         "https://web.telegram.org/*",
-        "https://www.instagram.com/direct/*"
+        "https://www.instagram.com/*"
       ],
       "js": ["content-loader.js"],
       "run_at": "document_idle"
