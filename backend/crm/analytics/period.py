@@ -33,9 +33,9 @@ class Period:
 
     @property
     def bucket(self):
-        if self.days <= 31:
+        if self.days <= 7:
             return "day"
-        return "week" if self.days <= 183 else "month"
+        return "week" if self.days <= 92 else "month"
 
     def previous(self):
         length = timedelta(days=self.days)

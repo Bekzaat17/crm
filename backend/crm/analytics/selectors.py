@@ -1,18 +1,17 @@
-"""Отчёт по обращениям компании.
+"""Отчёт центра за период: сколько обратились, поступили и отказались.
 
-Область данных задаёт стратегия роли (leads_for): менеджер видит только свои
-обращения, руководитель и администратор — все. Когорта — обращения, созданные
-за период; динамика — события (создание, поступление, отказ) по их дате.
+Все цифры — события периода: обращение создано, клиент поступил, клиент
+отказался. Область данных задаёт стратегия роли (leads_for): менеджер видит
+только свои обращения, руководитель и администратор — все.
 """
 
-from collections import Counter, defaultdict
-from statistics import median
+from collections import Counter
 
-from django.db.models import Count, F, Q
+from django.db.models import Count, F
 from django.utils import timezone
 
 from crm.core.validation import identifier
-from crm.organizations.models import Branch, Membership
+from crm.organizations.models import Membership
 from crm.organizations.permissions import Perm, can
 from crm.sales.models import LeadStageChange, PipelineStage
 from crm.sales.selectors import leads_for
@@ -22,235 +21,129 @@ from .period import Period
 
 Kind = PipelineStage.Kind
 NO_SOURCE = "Не указан"
+NO_REASON = "Без причины"
 OTHER = "Другие"
-TOP_SOURCES = 10
-TOP_REASONS = 8
-
-
-def _scoped_leads(member, query):
-    leads = leads_for(member)
-    if query.get("branch"):
-        leads = leads.filter(branch_id=identifier(query["branch"]))
-    if query.get("assignee") and can(member, Perm.VIEW_ALL_LEADS):
-        leads = leads.filter(assignee_id=identifier(query["assignee"]))
-    return leads
-
-
-def _created_in(leads, period: Period):
-    return leads.filter(created_at__gte=period.start, created_at__lt=period.end)
+TOP = 8
 
 
 def _rate(part, whole):
     return round(part / whole, 4) if whole else None
 
 
-def _days(changes_at, created_at):
-    return (changes_at - created_at).total_seconds() / 86400
-
-
-def _top(counter, limit):
+def _top(counter):
     ordered = counter.most_common()
-    head, tail = ordered[:limit], ordered[limit:]
+    head, tail = ordered[:TOP], ordered[TOP:]
     if tail:
         head.append((OTHER, sum(count for _, count in tail)))
     return head
+
+
+def _clean(text, empty):
+    return " ".join(text.split()) or empty
 
 
 class Report:
     def __init__(self, member, period: Period, query):
         self.member = member
         self.period = period
-        self.company_id = member.organization_id
         self.see_all = can(member, Perm.VIEW_ALL_LEADS)
-        self.leads = _scoped_leads(member, query)
-        self.cohort = list(
-            _created_in(self.leads, period).values(
-                "id",
-                "source",
-                "refusal_reason",
-                "assignee_id",
-                "created_at",
-                kind=F("stage__kind"),
+        leads = leads_for(member)
+        if query.get("assignee") and self.see_all:
+            leads = leads.filter(assignee_id=identifier(query["assignee"]))
+        self.leads = leads
+        self.created = list(
+            leads.filter(
+                created_at__gte=period.start, created_at__lt=period.end
+            ).values("created_at", "source", "assignee_id")
+        )
+        self.admitted = self._outcomes(Kind.ADMITTED)
+        self.refused = self._outcomes(Kind.REFUSED)
+
+    def _outcomes(self, kind):
+        """Первый за период переход обращения в этап типа kind."""
+        first = {}
+        changes = (
+            LeadStageChange.objects.filter(
+                lead__in=self.leads,
+                at__gte=self.period.start,
+                at__lt=self.period.end,
+                to_stage__kind=kind,
+            )
+            .exclude(from_stage__kind=kind)
+            .order_by("at", "id")
+            .values(
+                "lead_id",
+                "at",
+                source=F("lead__source"),
+                assignee_id=F("lead__assignee_id"),
+                reason=F("lead__refusal_reason"),
             )
         )
-        self.changes = defaultdict(list)
-        for change in (
-            LeadStageChange.objects.filter(lead__in=_created_in(self.leads, period))
-            .order_by("at", "id")
-            .values("lead_id", "to_stage_id", "at", kind=F("to_stage__kind"))
-        ):
-            self.changes[change["lead_id"]].append(change)
+        for change in changes:
+            first.setdefault(change["lead_id"], change)
+        return list(first.values())
 
-    # Когорта
-
-    def _admission_days(self, leads):
-        days = []
-        for lead in leads:
-            if lead["kind"] != Kind.ADMITTED:
-                continue
-            first = next(
-                (c for c in self.changes[lead["id"]] if c["kind"] == Kind.ADMITTED),
-                None,
-            )
-            if first:
-                days.append(_days(first["at"], lead["created_at"]))
-        return round(median(days), 1) if days else None
-
-    def _outcome(self, leads):
-        kinds = Counter(lead["kind"] for lead in leads)
-        created = len(leads)
+    def totals(self):
+        created, admitted = len(self.created), len(self.admitted)
         return {
             "created": created,
-            "open": kinds[Kind.OPEN],
-            "admitted": kinds[Kind.ADMITTED],
-            "refused": kinds[Kind.REFUSED],
-            "conversion": _rate(kinds[Kind.ADMITTED], created),
-            "median_days_to_admission": self._admission_days(leads),
+            "admitted": admitted,
+            "refused": len(self.refused),
+            "conversion": _rate(admitted, created),
         }
 
-    def previous(self):
-        totals = _created_in(self.leads, self.period.previous()).aggregate(
-            created=Count("id"),
-            admitted=Count("id", filter=Q(stage__kind=Kind.ADMITTED)),
-            refused=Count("id", filter=Q(stage__kind=Kind.REFUSED)),
-        )
-        totals["conversion"] = _rate(totals["admitted"], totals["created"])
-        return totals
-
-    def funnel(self):
-        """Сколько обращений дошло хотя бы до этапа. Поступившие считаются
-        прошедшими все открытые этапы; последний шаг — поступившие сейчас."""
-        stages = list(
-            PipelineStage.objects.filter(
-                organization_id=self.company_id, is_active=True, kind=Kind.OPEN
-            ).order_by("position")
-        )
-        if not stages:
-            return []
-        position = {stage.pk: stage.position for stage in stages}
-        reached = Counter()
-        admitted = 0
-        for lead in self.cohort:
-            if lead["kind"] == Kind.ADMITTED:
-                admitted += 1
-                continue
-            visited = [
-                position[c["to_stage_id"]]
-                for c in self.changes[lead["id"]]
-                if c["to_stage_id"] in position
-            ]
-            reached[max(visited, default=stages[0].position)] += 1
-        steps = []
-        for stage in stages:
-            count = admitted + sum(
-                n for pos, n in reached.items() if pos >= stage.position
-            )
-            steps.append(
-                {
-                    "id": str(stage.pk),
-                    "name": stage.name,
-                    "color": stage.color,
-                    "kind": stage.kind,
-                    "count": count,
-                }
-            )
-        steps.append(
+    def series(self):
+        buckets = {day: Counter() for day in self.period.buckets()}
+        for lead in self.created:
+            buckets[self.period.bucket_of(lead["created_at"])]["created"] += 1
+        for change in self.admitted:
+            buckets[self.period.bucket_of(change["at"])]["admitted"] += 1
+        return [
             {
-                "id": "admitted",
-                "name": "Поступили",
-                "color": "",
-                "kind": Kind.ADMITTED,
-                "count": admitted,
+                "start": day.isoformat(),
+                "created": c["created"],
+                "admitted": c["admitted"],
             }
-        )
-        return steps
+            for day, c in buckets.items()
+        ]
 
     def sources(self):
-        created, admitted = Counter(), Counter()
-        for lead in self.cohort:
-            name = lead["source"].strip() or NO_SOURCE
-            created[name] += 1
-            admitted[name] += lead["kind"] == Kind.ADMITTED
-        top = _top(created, TOP_SOURCES)
+        created = Counter(_clean(lead["source"], NO_SOURCE) for lead in self.created)
+        admitted = Counter(_clean(c["source"], NO_SOURCE) for c in self.admitted)
+        names = created + admitted
+        top = _top(names)
         named = {name for name, _ in top if name != OTHER}
         rows = []
-        for name, count in top:
-            won = (
-                sum(n for key, n in admitted.items() if key not in named)
-                if name == OTHER
-                else admitted[name]
+        for name, _ in top:
+            pick = (
+                (lambda n: n not in named) if name == OTHER else (lambda n: n == name)
             )
             rows.append(
                 {
                     "name": name,
-                    "created": count,
-                    "admitted": won,
-                    "conversion": _rate(won, count),
+                    "created": sum(v for n, v in created.items() if pick(n)),
+                    "admitted": sum(v for n, v in admitted.items() if pick(n)),
                 }
             )
         return rows
 
     def refusal_reasons(self):
         labels, counts = {}, Counter()
-        for lead in self.cohort:
-            if lead["kind"] != Kind.REFUSED:
-                continue
-            text = " ".join(lead["refusal_reason"].split()) or NO_SOURCE
-            key = text.casefold()
-            labels.setdefault(key, text)
-            counts[key] += 1
+        for change in self.refused:
+            text = _clean(change["reason"], NO_REASON)
+            labels.setdefault(text.casefold(), text)
+            counts[text.casefold()] += 1
         return [
             {"reason": labels.get(key, OTHER), "count": count}
-            for key, count in _top(counts, TOP_REASONS)
+            for key, count in _top(counts)
         ]
-
-    # Динамика
-
-    def series(self):
-        buckets = {day: Counter() for day in self.period.buckets()}
-        for lead in self.cohort:
-            buckets[self.period.bucket_of(lead["created_at"])]["created"] += 1
-        events = (
-            LeadStageChange.objects.filter(
-                lead__in=self.leads,
-                at__gte=self.period.start,
-                at__lt=self.period.end,
-                to_stage__kind__in=[Kind.ADMITTED, Kind.REFUSED],
-            )
-            .exclude(from_stage__kind=F("to_stage__kind"))
-            .values("at", kind=F("to_stage__kind"))
-        )
-        for event in events:
-            buckets[self.period.bucket_of(event["at"])][event["kind"]] += 1
-        return [
-            {
-                "start": day.isoformat(),
-                "created": counts["created"],
-                "admitted": counts[Kind.ADMITTED],
-                "refused": counts[Kind.REFUSED],
-            }
-            for day, counts in buckets.items()
-        ]
-
-    # Команда
-
-    def _members(self):
-        return {
-            m.pk: m
-            for m in Membership.objects.select_related("user")
-            .filter(organization_id=self.company_id)
-            .filter(
-                Q(is_active=True)
-                | Q(pk__in={lead["assignee_id"] for lead in self.cohort})
-            )
-        }
 
     def team(self):
         if not self.see_all:
             return None
-        by_member = defaultdict(list)
-        for lead in self.cohort:
-            by_member[lead["assignee_id"]].append(lead)
+        created = Counter(lead["assignee_id"] for lead in self.created)
+        admitted = Counter(c["assignee_id"] for c in self.admitted)
+        refused = Counter(c["assignee_id"] for c in self.refused)
         overdue = dict(
             FollowUpTask.objects.filter(
                 lead__in=self.leads,
@@ -260,38 +153,35 @@ class Report:
             .values_list("lead__assignee_id")
             .annotate(n=Count("id"))
         )
+        involved = set(created) | set(admitted) | set(refused) | set(overdue)
+        members = Membership.objects.select_related("user").filter(
+            organization_id=self.member.organization_id
+        )
         rows = [
             {
-                "id": str(pk),
-                "name": member.user.name,
-                "is_active": member.is_active,
-                "overdue_tasks": overdue.get(pk, 0),
-                **self._outcome(by_member[pk]),
+                "id": str(m.pk),
+                "name": m.user.name,
+                "created": created[m.pk],
+                "admitted": admitted[m.pk],
+                "refused": refused[m.pk],
+                "conversion": _rate(admitted[m.pk], created[m.pk]),
+                "overdue_tasks": overdue.get(m.pk, 0),
             }
-            for pk, member in self._members().items()
+            for m in members
+            if m.is_active or m.pk in involved
         ]
-        return sorted(rows, key=lambda r: (-r["created"], r["name"].casefold()))
+        return sorted(rows, key=lambda r: (-r["admitted"], -r["created"], r["name"]))
 
-    def filters(self):
-        branches = Branch.objects.filter(organization_id=self.company_id).order_by(
-            "-is_active", "name"
+    def assignees(self):
+        if not self.see_all:
+            return []
+        members = Membership.objects.select_related("user").filter(
+            organization_id=self.member.organization_id, is_active=True
         )
-        result = {
-            "branches": [
-                {"id": str(b.pk), "name": b.name, "is_active": b.is_active}
-                for b in branches
-            ],
-            "assignees": [],
-        }
-        if self.see_all:
-            members = Membership.objects.select_related("user").filter(
-                organization_id=self.company_id, is_active=True
-            )
-            result["assignees"] = sorted(
-                ({"id": str(m.pk), "name": m.user.name} for m in members),
-                key=lambda m: m["name"].casefold(),
-            )
-        return result
+        return sorted(
+            ({"id": str(m.pk), "name": m.user.name} for m in members),
+            key=lambda m: m["name"].casefold(),
+        )
 
     def data(self):
         return {
@@ -301,10 +191,8 @@ class Report:
                 "bucket": self.period.bucket,
             },
             "scope": "company" if self.see_all else "own",
-            "filters": self.filters(),
-            "totals": self._outcome(self.cohort),
-            "previous": self.previous(),
-            "funnel": self.funnel(),
+            "assignees": self.assignees(),
+            "totals": self.totals(),
             "series": self.series(),
             "sources": self.sources(),
             "refusal_reasons": self.refusal_reasons(),

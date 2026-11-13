@@ -49,8 +49,7 @@ export const NAVIGATION: NavItem[] = [
   {
     path: "/analytics",
     label: "Аналитика",
-    description:
-      "Новые обращения, поступления, отказы, воронка и работа сотрудников.",
+    description: "Сколько обратились, поступили и отказались за период.",
     icon: BarChart3,
   },
   {

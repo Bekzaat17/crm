@@ -821,11 +821,11 @@ h3:has(> .subtle-pill) {
   padding: 4px;
 }
 
-/* Аналитика. Цвета серий закреплены за сущностями: новые — синий,
-   поступили — бирюзовый, отказы — оранжевый (палитра проверена на дальтонизм). */
+/* Аналитика. Цвет закреплён за смыслом: обращения — синий, поступили —
+   зелёный, отказы — оранжевый (пара синий/зелёный проверена на дальтонизм). */
 :root {
   --series-created: #2563eb;
-  --series-admitted: #1baf7a;
+  --series-admitted: #16a34a;
   --series-refused: #eb6834;
   --chart-grid: #edf0f5;
 }
@@ -841,23 +841,12 @@ h3:has(> .subtle-pill) {
 .analytics-filters {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: center;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 18px;
 }
-.analytics-filters label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 11px;
-  color: var(--muted);
-}
-.analytics-filters select,
-.analytics-filters input {
-  width: 190px;
-}
-.analytics-scope {
-  margin: 0;
+.analytics-filters select {
+  width: 220px;
 }
 .kpi-grid {
   display: grid;
@@ -870,7 +859,7 @@ h3:has(> .subtle-pill) {
   gap: 8px;
   min-width: 0;
 }
-.kpi > span:first-child {
+.kpi > span {
   font-size: 11px;
   color: var(--muted);
 }
@@ -880,49 +869,43 @@ h3:has(> .subtle-pill) {
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
-.kpi-note,
-.kpi-delta {
+.kpi > small {
   font-size: 11px;
-  color: var(--ink);
-}
-.kpi-delta {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 3px;
-}
-.kpi-delta > .muted {
-  color: var(--muted);
 }
 .chart-card {
   min-width: 0;
 }
+.chart-card > .section-title {
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
 .segmented {
   display: inline-flex;
+  flex-wrap: wrap;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 2px;
-  background: var(--canvas);
+  border-radius: 9px;
+  padding: 3px;
+  background: var(--surface);
 }
 .segmented button {
   border: 0;
   background: transparent;
-  padding: 5px 10px;
+  padding: 7px 14px;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   cursor: pointer;
 }
 .segmented button[aria-pressed="true"] {
-  background: var(--surface);
-  color: var(--ink);
-  box-shadow: 0 1px 2px rgb(15 23 42 / 8%);
+  background: var(--primary-tint);
+  color: var(--primary);
+  font-weight: 600;
 }
 .chart-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 18px;
-  margin: 0 0 10px;
+  gap: 6px 16px;
+  margin: 0;
   padding: 0;
   list-style: none;
   font-size: 11px;
@@ -935,9 +918,9 @@ h3:has(> .subtle-pill) {
 }
 .chart-legend i,
 .chart-tooltip-row i {
-  width: 12px;
-  height: 3px;
-  border-radius: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
   display: inline-block;
 }
 .chart-frame {
@@ -948,11 +931,6 @@ h3:has(> .subtle-pill) {
   display: block;
   overflow: visible;
 }
-.chart-frame svg:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 4px;
-  border-radius: 4px;
-}
 .chart-grid {
   stroke: var(--chart-grid);
   stroke-width: 1;
@@ -962,20 +940,15 @@ h3:has(> .subtle-pill) {
   font-size: 10px;
   font-variant-numeric: tabular-nums;
 }
-.chart-crosshair {
-  stroke: #94a3b8;
-  stroke-width: 1;
+.chart-hover {
+  fill: var(--canvas);
 }
-.chart-line {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linejoin: round;
-  stroke-linecap: round;
+.chart-hit {
+  fill: transparent;
+  outline: none;
 }
-.chart-marker {
-  fill: currentColor;
-  stroke: var(--surface);
+.chart-hit:focus-visible {
+  stroke: var(--primary);
   stroke-width: 2;
 }
 .chart-tooltip {
@@ -985,7 +958,7 @@ h3:has(> .subtle-pill) {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  min-width: 170px;
+  min-width: 150px;
   padding: 9px 11px;
   background: var(--surface);
   border: 1px solid var(--line);
@@ -1008,7 +981,7 @@ h3:has(> .subtle-pill) {
   font-variant-numeric: tabular-nums;
 }
 .chart-empty {
-  margin: 8px 0;
+  margin: 4px 0;
   font-size: 12px;
 }
 .analytics-grid {
@@ -1019,14 +992,14 @@ h3:has(> .subtle-pill) {
 .bar-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 .bar-list li {
   display: grid;
-  grid-template-columns: minmax(90px, 34%) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(90px, 38%) minmax(0, 1fr) 32px;
   align-items: center;
   gap: 12px;
   font-size: 12px;
@@ -1038,7 +1011,7 @@ h3:has(> .subtle-pill) {
   color: var(--ink);
 }
 .bar-track {
-  height: 16px;
+  height: 14px;
 }
 .bar-fill {
   display: block;
@@ -1047,31 +1020,26 @@ h3:has(> .subtle-pill) {
   border-radius: 0 4px 4px 0;
 }
 .bar-value {
-  min-width: 64px;
   text-align: right;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 .section-title.padded {
   padding: 18px 23px 4px;
 }
 .analytics-table th,
 .analytics-table td {
-  padding: 12px 23px;
+  padding: 11px 23px;
+}
+.chart-card .analytics-table th,
+.chart-card .analytics-table td {
+  padding: 9px 0;
 }
 .analytics-table td {
   font-size: 12px;
 }
-.analytics-table .numeric,
-.analytics-table td:last-child {
+.analytics-table .numeric {
   text-align: right;
   font-variant-numeric: tabular-nums;
-}
-.analytics-table .subtle-pill {
-  margin-left: 8px;
-}
-.table-card .chart-empty {
-  padding: 0 23px 18px;
 }
 @media (max-width: 900px) {
   .kpi-grid {
@@ -1082,16 +1050,7 @@ h3:has(> .subtle-pill) {
   }
 }
 @media (max-width: 560px) {
-  .analytics-filters label,
-  .analytics-filters select,
-  .analytics-filters input {
+  .analytics-filters select {
     width: 100%;
-  }
-  .bar-list li {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-  .bar-track {
-    grid-column: 1 / -1;
-    grid-row: 2;
   }
 }

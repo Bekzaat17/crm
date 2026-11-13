@@ -10,7 +10,7 @@
 - `backend/crm/platform_admin` — создание компаний; доступно только суперпользователю (`ensure_superuser` из `.env`).
 - `backend/crm/organizations` — компании, членства, филиалы, приглашения, аудит, права ролей (`permissions.py`) и контекст компании (`context.get_membership`).
 - `backend/crm/sales`, `work`, `integrations` — клиенты, обращения и этапы воронки, задачи и сводка, передача в RehubPro.
-- `backend/crm/analytics` — отчёт для руководителя: итоги, воронка, динамика, источники и сотрудники; область данных задаёт стратегия роли, переходы этапов хранит `LeadStageChange`.
+- `backend/crm/analytics` — отчёт за период: обращения, поступления, отказы, источники и менеджеры; область данных задаёт стратегия роли, переходы этапов хранит `LeadStageChange`.
 - `backend/crm/notifications` — очередь сообщений, каналы (почта, Telegram, Web Push), напоминания.
 - `backend/crm/conversations` — ключи расширения и импорт переписки (API `/api/ext/`, только Bearer-ключ).
 - `extension` — расширение Chrome MV3 (TypeScript, адаптеры WhatsApp Web, Telegram Web, Instagram).
