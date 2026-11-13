@@ -41,10 +41,17 @@ async function syncIfChanged() {
   ].join("|");
   if (signature === lastSignature) return;
   lastSignature = signature;
-  const result = (await chrome.runtime.sendMessage({
-    type: "rehub:sync",
-    read,
-  })) as SyncResponse;
+  let result: SyncResponse;
+  try {
+    result = (await chrome.runtime.sendMessage({
+      type: "rehub:sync",
+      read,
+    })) as SyncResponse;
+  } catch {
+    // Расширение обновили или перезапустили: страницу нужно обновить.
+    lastSignature = "";
+    return badge("CRM: обновите страницу", true);
+  }
   if (!result?.connected || !result.tracked) return badge("");
   if (result.error) {
     lastSignature = ""; // повторим при следующем изменении страницы
@@ -57,9 +64,14 @@ async function syncIfChanged() {
   );
 }
 
+// Мессенджеры меняют страницу постоянно (статус «в сети», «печатает…»),
+// поэтому проверяем не чаще раза в SYNC_DELAY, а не откладываем бесконечно.
 new MutationObserver(() => {
-  window.clearTimeout(timer);
-  timer = window.setTimeout(() => void syncIfChanged(), SYNC_DELAY);
+  if (timer !== undefined) return;
+  timer = window.setTimeout(() => {
+    timer = undefined;
+    void syncIfChanged();
+  }, SYNC_DELAY);
 }).observe(document.body, {
   childList: true,
   subtree: true,

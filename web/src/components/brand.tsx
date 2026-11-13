@@ -1,11 +1,14 @@
-import { ArrowUpRight } from "lucide-react";
-
 export function Brand({ light = false }: { light?: boolean }) {
   return (
     <div className={`brand ${light ? "brand-light" : ""}`}>
-      <span className="brand-mark">
-        <ArrowUpRight size={23} strokeWidth={2.8} />
-      </span>
+      {/* Логотип RehubPro: web/public/logo.png из rehubpro-main/static/logo. */}
+      <img
+        className="brand-logo"
+        src="/logo.png"
+        alt=""
+        width={34}
+        height={34}
+      />
       <span>
         rehub<span className="brand-pro">pro</span>
         <span className="brand-crm">CRM</span>

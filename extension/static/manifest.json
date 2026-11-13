@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "RehubPro CRM: передача переписки",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Передаёт отмеченные чаты WhatsApp Web, Telegram Web и Instagram в обращения RehubPro CRM.",
   "permissions": ["storage", "identity"],
   "host_permissions": [
@@ -9,14 +9,14 @@
     "https://web.telegram.org/*",
     "https://www.instagram.com/*"
   ],
-  "optional_host_permissions": [
-    "https://*/*",
-    "http://127.0.0.1/*",
-    "http://localhost/*"
-  ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Передать в CRM"
+    "default_title": "Передать в CRM",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    }
   },
   "content_scripts": [
     {
@@ -43,5 +43,11 @@
   "background": {
     "service_worker": "background.js",
     "type": "module"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
   }
 }

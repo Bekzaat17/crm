@@ -4,7 +4,7 @@ import {
   type ChatRef,
   type ChatStatus,
 } from "./crm-client.js";
-import { loadSettings, login, logout } from "./settings.js";
+import { loadSettings, logout } from "./settings.js";
 import type { ReadResult } from "./types.js";
 
 const $ = <T extends HTMLElement>(id: string) =>
@@ -89,11 +89,11 @@ async function suggestLeads(fragment: ReadResult) {
 
 async function start() {
   const settings = await loadSettings();
-  $<HTMLInputElement>("crm-url").value = settings.crmUrl;
   if (!settings.key) {
     show("login-form", true);
     show("logout", false);
-    status("Войдите один раз — дальше расширение работает само.");
+    show("chat", false);
+    status("");
     return;
   }
   show("login-form", false);
@@ -122,13 +122,11 @@ async function start() {
 
 $("login-form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  try {
-    status("Подтвердите доступ на странице CRM…");
-    await login($<HTMLInputElement>("crm-url").value);
-    await start();
-  } catch (error) {
-    status(message(error), true);
-  }
+  status("Подтвердите доступ в открывшемся окне CRM…");
+  // Вход выполняет фоновый worker: окно входа закрывает popup.
+  const result = await chrome.runtime.sendMessage({ type: "rehub:login" });
+  if (result?.ok) await start();
+  else status(result?.error || "Вход не выполнен.", true);
 });
 
 $("logout").addEventListener("click", async () => {

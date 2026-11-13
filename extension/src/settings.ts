@@ -1,38 +1,25 @@
+import { CRM_URL } from "./config.js";
+
 export type Settings = { crmUrl: string; key: string; company: string };
 
 export async function loadSettings(): Promise<Settings> {
   const stored = (await chrome.storage.local.get([
-    "crmUrl",
     "key",
     "company",
   ])) as Partial<Settings>;
   return {
-    crmUrl: stored.crmUrl || "",
+    crmUrl: CRM_URL,
     key: stored.key || "",
     company: stored.company || "",
   };
 }
 
-function crmOrigin(value: string) {
-  const url = new URL(value);
-  const local = ["127.0.0.1", "localhost"].includes(url.hostname);
-  if (url.protocol !== "https:" && !(local && url.protocol === "http:"))
-    throw new Error("Адрес CRM должен начинаться с https://");
-  return url.origin;
-}
-
-/** Вход через CRM: пользователь подтверждает доступ на сайте, ключ приходит
- *  во фрагменте адреса расширения и сохраняется только в chrome.storage. */
-export async function login(crmUrl: string) {
-  const origin = crmOrigin(crmUrl);
-  const granted = await chrome.permissions.request({
-    origins: [`${origin}/*`],
-  });
-  if (!granted) throw new Error("Разрешите расширению доступ к адресу CRM.");
+/** Вход через CRM. Вызывается только из фонового worker: popup закрывается,
+ *  когда открывается окно входа, и потерял бы результат. */
+export async function login() {
   const state = crypto.randomUUID();
-  const redirect = chrome.identity.getRedirectURL("crm");
-  const url = `${origin}/extension/connect?${new URLSearchParams({
-    redirect_uri: redirect,
+  const url = `${CRM_URL}/extension/connect?${new URLSearchParams({
+    redirect_uri: chrome.identity.getRedirectURL("crm"),
     state,
   })}`;
   const result = await chrome.identity.launchWebAuthFlow({
@@ -43,7 +30,6 @@ export async function login(crmUrl: string) {
   if (params.get("state") !== state || !params.get("token"))
     throw new Error("Вход не завершён. Повторите подключение.");
   await chrome.storage.local.set({
-    crmUrl: origin,
     key: params.get("token"),
     company: params.get("company") || "",
   });

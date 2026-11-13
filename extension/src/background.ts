@@ -4,7 +4,7 @@ import {
   fragmentKey,
   type ChatStatus,
 } from "./crm-client.js";
-import { loadSettings } from "./settings.js";
+import { loadSettings, login } from "./settings.js";
 import type { ReadResult } from "./types.js";
 
 type SyncRequest = { type: "rehub:sync"; read: ReadResult };
