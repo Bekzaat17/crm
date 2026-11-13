@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Bell, Send } from "lucide-react";
+import { Bell, Mail, Send } from "lucide-react";
 import { api } from "@/lib/api";
 import { currentSubscription, pushSupported, subscribePush } from "@/lib/push";
 import { useMutation } from "@/lib/use-mutation";
@@ -61,7 +61,7 @@ export function NotificationSettings() {
       <div className="section-title">
         <h2>Напоминания</h2>
       </div>
-      <p className="small muted">
+      <p className="card-intro">
         Когда наступает срок задачи или время следующего контакта, CRM пришлёт
         короткое напоминание без имени клиента. Подробности открываются по
         ссылке после входа. Настройки действуют для всех ваших компаний.
@@ -180,6 +180,7 @@ export function NotificationSettings() {
       </div>
 
       <div className="settings-row">
+        <Mail size={18} />
         <strong>Почта</strong>
         <span className="small muted">Напоминания на адрес аккаунта</span>
         <div className="row-actions">

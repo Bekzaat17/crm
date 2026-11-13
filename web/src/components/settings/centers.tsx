@@ -142,8 +142,10 @@ export function Centers() {
   return (
     <section>
       <article className="card">
-        <h2>Добавить центр RehubPro</h2>
-        <p className="sales-hint muted integration-intro">
+        <div className="section-title">
+          <h2>Добавить центр RehubPro</h2>
+        </div>
+        <p className="card-intro">
           Вставьте домен или полную ссылку. Например,
           test.rehubpro.kz/qqweqw/qweqwe станет
           https://test.rehubpro.kz/crm/create. Путь страницы будет отброшен.
@@ -191,6 +193,15 @@ export function Centers() {
         <LoadingState text="Загружаем центры…" />
       ) : (
         <div className="task-list sales-section">
+          {!centers.data.items.length && (
+            <div className="card empty-state compact">
+              <h3>Центров пока нет</h3>
+              <p>
+                Добавьте центр выше, затем сохраните ключ и проверьте
+                подключение.
+              </p>
+            </div>
+          )}
           {centers.data.items.map((center) => (
             <CenterCard
               key={`${center.id}-${center.version}`}

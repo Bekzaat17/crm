@@ -167,9 +167,7 @@ export function Overview() {
           </article>
         ))}
       </div>
-      <div className="overview-grid">
-        <RecentEvents />
-      </div>
+      <RecentEvents />
     </>
   );
 }

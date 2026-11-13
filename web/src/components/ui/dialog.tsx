@@ -17,6 +17,12 @@ export function Dialog({
   useEffect(() => {
     const dialog = ref.current;
     dialog?.showModal();
+    // Фокус в первое поле формы, а не на кнопку закрытия.
+    dialog
+      ?.querySelector<HTMLElement>(
+        "input:not([type=hidden]):not([type=checkbox]), select, textarea",
+      )
+      ?.focus();
     return () => dialog?.close();
   }, []);
   return (

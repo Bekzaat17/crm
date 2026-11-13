@@ -33,7 +33,7 @@ export function LeadConversations({ path }: { path: string }) {
             {conversation.source_label} · {conversation.title} ·{" "}
             {conversation.message_count} сообщ.
           </summary>
-          <p className="small muted">
+          <p className="card-intro">
             Передано из браузера: CRM хранит только выбранные фрагменты.
             {conversation.imports[0]?.note &&
               ` Последний импорт: ${conversation.imports[0].note}.`}

@@ -225,85 +225,87 @@ export function AuthScreen({ mode }: { mode: Mode }) {
                       </div>
                     </div>
                   )}
-                  <form onSubmit={submit} className="auth-form">
-                    {mode === "invite" && !session?.user && (
-                      <label>
-                        Ваше имя
-                        <input
-                          name="name"
-                          autoComplete="name"
-                          required
-                          maxLength={120}
-                          placeholder="Как к вам обращаться"
-                        />
-                      </label>
-                    )}
-                    {["login", "forgot"].includes(mode) && (
-                      <label>
-                        Электронная почта
-                        <input
-                          name="email"
-                          type="email"
-                          autoComplete="email"
-                          maxLength={254}
-                          required
-                          placeholder="you@company.kz"
-                        />
-                      </label>
-                    )}
-                    {(["login", "reset"].includes(mode) ||
-                      (mode === "invite" && !session?.user)) && (
-                      <label>
-                        Пароль
-                        <input
-                          name="password"
-                          type="password"
-                          autoComplete={
-                            mode === "login"
-                              ? "current-password"
-                              : "new-password"
-                          }
-                          minLength={mode === "login" ? undefined : 10}
-                          maxLength={128}
-                          required
-                          placeholder={
-                            mode === "login"
-                              ? "Введите пароль"
-                              : "Не менее 10 символов"
-                          }
-                        />
-                      </label>
-                    )}
-                    {mode === "login" && (
-                      <Link href="/forgot" className="forgot-link">
-                        Забыли пароль?
-                      </Link>
-                    )}
-                    {mode === "invite" && session?.user && (
-                      <p className="small muted">
-                        Вы вошли как {session.user.email}.
-                      </p>
-                    )}
-                    <button
-                      className="button primary full"
-                      disabled={
-                        busy ||
-                        (["reset", "invite"].includes(mode) && !token) ||
-                        (mode === "invite" && !invitation)
-                      }
-                    >
-                      {busy
-                        ? "Подождите…"
-                        : {
-                            login: "Войти в пространство",
-                            invite: "Присоединиться к команде",
-                            forgot: "Отправить ссылку",
-                            reset: "Сохранить пароль",
-                          }[mode]}
-                      {!busy && <ArrowRight size={17} />}
-                    </button>
-                  </form>
-                  {mode === "invite" && !session?.user && (
+                  {!(mode === "invite" && !invitation) && (
+                    <form onSubmit={submit} className="auth-form">
+                      {mode === "invite" && !session?.user && (
+                        <label>
+                          Ваше имя
+                          <input
+                            name="name"
+                            autoComplete="name"
+                            required
+                            maxLength={120}
+                            placeholder="Как к вам обращаться"
+                          />
+                        </label>
+                      )}
+                      {["login", "forgot"].includes(mode) && (
+                        <label>
+                          Электронная почта
+                          <input
+                            name="email"
+                            type="email"
+                            autoComplete="email"
+                            maxLength={254}
+                            required
+                            placeholder="you@company.kz"
+                          />
+                        </label>
+                      )}
+                      {(["login", "reset"].includes(mode) ||
+                        (mode === "invite" && !session?.user)) && (
+                        <label>
+                          Пароль
+                          <input
+                            name="password"
+                            type="password"
+                            autoComplete={
+                              mode === "login"
+                                ? "current-password"
+                                : "new-password"
+                            }
+                            minLength={mode === "login" ? undefined : 10}
+                            maxLength={128}
+                            required
+                            placeholder={
+                              mode === "login"
+                                ? "Введите пароль"
+                                : "Не менее 10 символов"
+                            }
+                          />
+                        </label>
+                      )}
+                      {mode === "login" && (
+                        <Link href="/forgot" className="forgot-link">
+                          Забыли пароль?
+                        </Link>
+                      )}
+                      {mode === "invite" && session?.user && (
+                        <p className="small muted">
+                          Вы вошли как {session.user.email}.
+                        </p>
+                      )}
+                      <button
+                        className="button primary full"
+                        disabled={
+                          busy ||
+                          (["reset", "invite"].includes(mode) && !token) ||
+                          (mode === "invite" && !invitation)
+                        }
+                      >
+                        {busy
+                          ? "Подождите…"
+                          : {
+                              login: "Войти в пространство",
+                              invite: "Присоединиться к команде",
+                              forgot: "Отправить ссылку",
+                              reset: "Сохранить пароль",
+                            }[mode]}
+                        {!busy && <ArrowRight size={17} />}
+                      </button>
+                    </form>
+                  )}
+                  {mode === "invite" && invitation && !session?.user && (
                     <button
                       className="text-button invite-login"
                       onClick={inviteLogin}

@@ -53,26 +53,24 @@ export function TaskItem({
           void update({ ...data, due_at: fromLocalInput(data.due_at) });
         }}
       >
-        <div className="form-grid">
-          <label>
-            Задача
-            <input
-              name="title"
-              required
-              maxLength={240}
-              defaultValue={task.title}
-            />
-          </label>
-          <label>
-            Срок
-            <input
-              name="due_at"
-              type="datetime-local"
-              required
-              defaultValue={toLocalInput(task.due_at)}
-            />
-          </label>
-        </div>
+        <label>
+          Задача
+          <input
+            name="title"
+            required
+            maxLength={240}
+            defaultValue={task.title}
+          />
+        </label>
+        <label>
+          Срок
+          <input
+            name="due_at"
+            type="datetime-local"
+            required
+            defaultValue={toLocalInput(task.due_at)}
+          />
+        </label>
         <div className="task-actions">
           <button className="button secondary" disabled={busy}>
             Сохранить

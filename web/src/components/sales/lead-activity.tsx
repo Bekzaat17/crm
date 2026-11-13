@@ -36,7 +36,7 @@ export function LeadActivity({
       <ErrorAlert message={error} />
       <article className="card sales-section">
         <h3>Новая задача</h3>
-        <p className="small muted">
+        <p className="card-intro">
           Ответственный — {lead.assignee_name}. Все задачи доступны в разделе
           «Задачи».
         </p>

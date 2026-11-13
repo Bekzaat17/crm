@@ -102,7 +102,7 @@ export function BranchSettings() {
       <div className="section-title">
         <h2>Филиалы</h2>
       </div>
-      <p className="small muted">
+      <p className="card-intro">
         Обращение относится к одному действующему филиалу. Филиал с обращениями
         не удаляется — его можно отправить в архив.
       </p>

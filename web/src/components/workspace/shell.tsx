@@ -83,7 +83,7 @@ function Sidebar() {
         </div>
         <div className="user-block">
           <span className="avatar">{name.slice(0, 1).toUpperCase()}</span>
-          <div>
+          <div title={`${name} · ${organization.role_label}`}>
             <strong>{name}</strong>
             <span>{organization.role_label}</span>
           </div>
